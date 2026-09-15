@@ -36,8 +36,15 @@ defaults here, follow the preferences, and always apply "Learned from our feedba
 7. INGREDIENTS: only things reliably stocked at a regular Dutch Albert Heijn. Write the English
    name with the Dutch product name in parentheses when it helps to find it, e.g.
    "chicken thigh fillet (kipdijfilet)", "Thai red curry paste (AH / Go-Tan)",
-   "wok vegetable mix (AH wokgroente)". Do not invent brands or niche products; if unsure it
-   exists at a normal AH, pick the common alternative.
+   "wok vegetable mix (AH wokgroente)". Stick to mainstream supermarket products: AH own-brand,
+   or common mainstream brands AH stocks (Go-Tan, Conimex, Patak's, Bertolli, Grand'Italia, Knorr,
+   Unox, Honig, Calvé, Maggi and similar). Never call for specialty/deli/world-food-shop items a
+   regular city-centre AH will not have (e.g. nduja, gochujang from a Korean grocer, Japanese curry
+   roux blocks, doubanjiang, fish sauce brands not sold at AH) — use the closest AH-available
+   substitute instead (e.g. sambal oelek or a jarred Asian chili paste instead of gochujang, an AH
+   massaman/red curry paste instead of an imported curry roux block). If the user's own hint or
+   instruction explicitly asks for a specific specialty ingredient, honour it. Do not invent brands
+   or niche products; if unsure it exists at a normal AH, pick the common alternative.
    Amounts are supermarket packs for 2 hungry people: "1 pack (300 g)", "1 bag (400 g)",
    "1 can (400 ml)", "1/2 jar"; 200-250 g dry rice or pasta for two. Put each ingredient in the
    right aisle. Keep the list short (typically 5-9 items).
