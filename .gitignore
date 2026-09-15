@@ -1,0 +1,6 @@
+.env
+app.yaml
+node_modules/
+client/node_modules/
+client/dist/
+.DS_Store
