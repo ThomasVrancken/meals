@@ -1,0 +1,14 @@
+# Files NOT uploaded by `gcloud app deploy`. App Engine runs the root `build`
+# script, which installs and builds the client there, so client source IS
+# uploaded but local dependencies/build output are not.
+.gcloudignore
+.git
+.gitignore
+.env
+.env.*
+.DS_Store
+node_modules/
+client/node_modules/
+client/dist/
+scripts/
+*.log

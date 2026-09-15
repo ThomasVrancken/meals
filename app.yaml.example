@@ -1,0 +1,29 @@
+# Template for the App Engine Standard deployment of the `meals` service.
+# Copy to app.yaml (gitignored, holds real secrets) and fill in the placeholders:
+#   cp app.yaml.example app.yaml
+# Never commit app.yaml. Firestore is accessed via the App Engine default
+# service account (ADC); no extra IAM setup needed for the (default) database.
+runtime: nodejs22
+service: meals
+
+instance_class: F1
+
+automatic_scaling:
+  min_instances: 0
+  max_instances: 2
+  target_cpu_utilization: 0.7
+
+handlers:
+  - url: /.*
+    script: auto
+    secure: always
+
+env_variables:
+  NODE_ENV: production
+  GOOGLE_CLOUD_PROJECT: mlsd-2026-483513
+  # Shared (default) Firestore database: every collection gets this prefix.
+  COLLECTION_PREFIX: meals_
+  APP_TOKEN: APP_TOKEN_PLACEHOLDER
+  OPENAI_API_KEY: OPENAI_API_KEY_PLACEHOLDER
+  OPENAI_MODEL: gpt-5.4
+  OPENAI_MODEL_FAST: gpt-5.4-mini
