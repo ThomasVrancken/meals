@@ -14,6 +14,7 @@ export function DataProvider({ children }) {
   const [history, setHistory] = useState([])
   const [preferences, setPreferences] = useState(null)
   const [prefsHistory, setPrefsHistory] = useState([])
+  const [shoppingItems, setShoppingItems] = useState([]) // manual "Other groceries" list
   const [loaded, setLoaded] = useState(false)
   const loadingRef = useRef(false)
 
@@ -47,9 +48,15 @@ export function DataProvider({ children }) {
     return changes
   }, [])
 
+  const refreshShoppingItems = useCallback(async () => {
+    const { items } = await api.getShoppingItems()
+    setShoppingItems(items)
+    return items
+  }, [])
+
   const refreshAll = useCallback(async () => {
-    await Promise.all([refreshRecipes(), refreshWeek(), refreshHistory(), refreshPreferences()])
-  }, [refreshRecipes, refreshWeek, refreshHistory, refreshPreferences])
+    await Promise.all([refreshRecipes(), refreshWeek(), refreshHistory(), refreshPreferences(), refreshShoppingItems()])
+  }, [refreshRecipes, refreshWeek, refreshHistory, refreshPreferences, refreshShoppingItems])
 
   useEffect(() => {
     if (loadingRef.current) return
@@ -70,9 +77,10 @@ export function DataProvider({ children }) {
         tasks.push(refreshPreferences())
         tasks.push(refreshPrefsHistory())
       }
+      if (changed.shopping) tasks.push(refreshShoppingItems())
       await Promise.all(tasks)
     },
-    [refreshRecipes, refreshWeek, refreshHistory, refreshPreferences, refreshPrefsHistory]
+    [refreshRecipes, refreshWeek, refreshHistory, refreshPreferences, refreshPrefsHistory, refreshShoppingItems]
   )
 
   // Optimistically patch a recipe in local state (used for instant-feeling
@@ -81,21 +89,34 @@ export function DataProvider({ children }) {
     setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
   }, [])
 
+  // Optimistic helpers for the manual shopping list (check/uncheck, delete).
+  const patchShoppingItemLocal = useCallback((id, patch) => {
+    setShoppingItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+  }, [])
+
+  const removeShoppingItemLocal = useCallback((id) => {
+    setShoppingItems((prev) => prev.filter((i) => i.id !== id))
+  }, [])
+
   const value = {
     recipes,
     week,
     history,
     preferences,
     prefsHistory,
+    shoppingItems,
     loaded,
     refreshRecipes,
     refreshWeek,
     refreshHistory,
     refreshPreferences,
     refreshPrefsHistory,
+    refreshShoppingItems,
     refreshAll,
     applyChanged,
     patchRecipeLocal,
+    patchShoppingItemLocal,
+    removeShoppingItemLocal,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

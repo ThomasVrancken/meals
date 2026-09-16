@@ -85,14 +85,16 @@ Seed values (written once if the doc does not exist; also used as fallback):
   - All groceries at Albert Heijn "AH Haarlemmerplein", Haarlemmerplein 34, 1013 HS Amsterdam (a regular city-centre AH, not an XL).
   - Only use ingredients reliably stocked at a regular Albert Heijn in the Netherlands. Prefer AH own-brand / common Dutch supermarket products, and give the Dutch product name in parentheses when it helps find it (e.g. "Thai red curry paste (AH / Go-Tan)", "kipdijfilet").
   - Cooking for 2 people (Thomas and Lote). Standard supermarket pack sizes (e.g. "1 bag (400 g)").
+  - For less common products (specific pastes, sauces, spices, Asian/Mexican items), say where to find them in the AH store (e.g. world food aisle, chilled section).
 - **learned**: `""` (maintained by the app from feedback; see Learning)
 
 `{prefix}recipes/{id}`:
 ```
 { id, title, emoji, description (1 sentence, what it is / why it fits),
   cuisine, tags: [string], timeMinutes: number, servings: number (2), pans: number (1|2),
-  ingredients: [{ name, amount, aisle, note? }],
+  ingredients: [{ name, amount, aisle, note?, where? }],
   steps: [string],                 // 3–6 short, direct steps
+  tips: [string],                  // 0–3 short, genuinely useful tips; [] if none. Never seasoning fluff.
   status: 'suggested'|'saved'|'dismissed',
   inWeek: boolean,                 // picked for this week's shopping
   feedback: 'up'|'down'|null, feedbackNote: string|null,
@@ -100,8 +102,38 @@ Seed values (written once if the doc does not exist; also used as fallback):
   cookedCount: number, lastCookedAt: ISO|null,
   hint: string|null, createdAt, updatedAt }
 ```
-`aisle` enum: `produce`, `meat-fish`, `dairy-eggs`, `pasta-rice-noodles`, `sauces-spices`,
-`canned-jars`, `frozen`, `bakery`, `other`.
+`ingredients[].where`: optional store-section hint (nullable), only filled for non-obvious/fancier
+items, e.g. `"World food aisle, Asian section"`, `"Chilled section near the fresh pasta"`. Null for
+obvious items (pasta, rice, minced beef, milk, eggs, plain vegetables).
+
+`aisle` enum (`server/aisles.js` is the single source of truth — key, label, walking-order `order`,
+and a `description` fed to every LLM prompt): Thomas & Lote's actual walking order through AH
+Haarlemmerplein.
+
+| order | key | label | typical contents |
+|---|---|---|---|
+| 1 | `spices` | Spices | powdered/dried spices & herbs, spice mixes in jars (not taco kits) |
+| 2 | `fruit` | Fruit | fresh fruit, lemons/limes |
+| 3 | `vegetables` | Vegetables | fresh veg incl. pre-cut veg bags, fresh herbs, garlic, ginger |
+| 4 | `fresh-meals` | Fresh pasta & ready-made | chilled ready meals, fresh tortellini/gnocchi/pasta, fresh chilled sauces, fresh pesto |
+| 5 | `meat` | Meat & fish | fresh meat, chicken, minced beef, fish, prawns |
+| 6 | `cheese-deli` | Cheese & deli | cheese (incl. grated), charcuterie, bacon lardons, chorizo |
+| 7 | `bread` | Bread | bread, bakery-shelf wraps, naan |
+| 8 | `carbs` | Rice & pasta | dry rice, pasta, noodles, couscous |
+| 9 | `world-food` | World food | tortillas, Worcestershire, tomato purée/passata, taco seasoning, curry pastes, coconut milk, soy/sweet chili/sambal, Asian/Mexican/international products |
+| 10 | `cereals` | Cereals | breakfast cereals, oats |
+| 11 | `snacks` | Chips & crackers | chips, crackers, nuts for snacking |
+| 12 | `tea` | Tea & coffee | tea (and coffee) |
+| 13 | `dairy` | Dairy | milk, cooking cream, yoghurt, butter, eggs, coconut-free chilled dairy |
+| 14 | `drinks` | Drinks | beer, soft drinks, juice, water |
+| 15 | `misc` | Other | everything else (frozen, canned goods not covered above, household, etc.) |
+
+A pre-2026-09 dataset used a 9-key taxonomy (`produce`, `meat-fish`, `dairy-eggs`,
+`pasta-rice-noodles`, `sauces-spices`, `canned-jars`, `frozen`, `bakery`, `other`);
+`server/aisles.js`'s `OLD_TO_NEW_AISLE` maps each to its closest new key, used both by
+`scripts/migrate-aisles.js` (one-off backfill) and as a read-time safety net (`normalizeAisle`) so
+any unmigrated data still groups sensibly instead of crashing or vanishing.
+
 Status semantics: `suggested` = shown in Ideas; `saved` = in the cookbook (favourites / cooked
 before); `dismissed` = hidden (kept as a negative signal). Thumbs-down on a suggestion sets
 `feedback:'down'` AND `status:'dismissed'`. Thumbs-up sets `feedback:'up'` and `status:'saved'`.
@@ -111,6 +143,12 @@ Cooking a recipe sets `status:'saved'`, `inWeek:false`, increments `cookedCount`
 
 `{prefix}chat/{id}`: `{ id, role: 'user'|'assistant', text, actions: [{ type, label, recipeId? }], createdAt }`
 (`actions` = human-readable list of what the agent changed, rendered as small chips under the reply.)
+
+`{prefix}shoppingItems/{id}`: `{ id, name, amount: string|null, aisle, checked: boolean, createdAt, updatedAt }`
+Manual "Other groceries" list, shared by both phones, independent of recipes (works as a general
+grocery list even with no recipes picked for the week). `aisle` is classified automatically on
+create with a tiny fast-model call (`server/services/classifyAisle.js`, falls back to `misc` on any
+error) since there's no recipe context to infer it from; PATCH lets the user change it.
 
 `{prefix}meta/counters`: `{ feedbackSinceReflection: number }`
 
@@ -125,6 +163,7 @@ Cooking a recipe sets `status:'saved'`, `inWeek:false`, increments `cookedCount`
 | POST `/api/recipes/generate` | `{count?=5 (1–8), hint?}` | `{recipes}` (newly created, status suggested) |
 | PATCH `/api/recipes/:id` | any of title, emoji, description, ingredients, steps, timeMinutes, tags, inWeek, status, feedback, feedbackNote | `{recipe}` (feedback changes follow status semantics above + count as feedback event) |
 | POST `/api/recipes/:id/ai-edit` | `{instruction, asVariation?:false}` | `{recipe, summary}` (in place, or new saved recipe with parentId) |
+| POST `/api/recipes/:id/ask` | `{question, history?: [{role:'user'\|'assistant', text}]}` | `{answer}` — answers about the recipe, never mutates it; client resends prior Q&A turns as `history` for follow-ups |
 | POST `/api/recipes/:id/cooked` | `{rating?, note?, cookedAt?}` | `{recipe, entry}` |
 | POST `/api/recipes/clear-suggestions` | | `{dismissed: n}`: dismiss suggestions with no feedback and not inWeek (no feedback event) |
 | GET `/api/week` | | `{recipes, shoppingList: [{aisle, items:[{name, amounts:[string], recipes:[title]}]}]}` |
@@ -135,8 +174,13 @@ Cooking a recipe sets `status:'saved'`, `inWeek:false`, increments `cookedCount`
 | PUT `/api/preferences` | subset of the 5 fields | `{preferences}` (updatedBy user, snapshot) |
 | GET `/api/preferences/history` | | `{changes}` last 20 |
 | GET `/api/chat` | | `{messages}` last 60, oldest first |
-| POST `/api/chat` | `{message}` | `{messages:[userMsg, assistantMsg], changed:{recipes,week,history,preferences}: booleans}` |
+| POST `/api/chat` | `{message}` | `{messages:[userMsg, assistantMsg], changed:{recipes,week,history,preferences,shopping}: booleans}` |
 | DELETE `/api/chat` | | `{ok}` clears conversation (not data) |
+| GET `/api/shopping-items` | | `{items}` oldest first |
+| POST `/api/shopping-items` | `{name, amount?}` | `{item}` (201; aisle auto-classified) |
+| PATCH `/api/shopping-items/:id` | any of `name, amount, checked, aisle` | `{item}` |
+| DELETE `/api/shopping-items/:id` | | `{ok}` |
+| POST `/api/shopping-items/clear-checked` | | `{deleted: n}` |
 
 Errors: `{error: string}` with sensible status. LLM calls can take 10–60 s; that's fine.
 
@@ -188,8 +232,18 @@ Tools (all operate on the same services the routes use):
 - `create_recipe({recipe fields..., status})`: e.g. "what we actually ate" when no matching recipe
 - `log_cooked({recipeId?, title?, rating?, note?, cookedAt?})`: if recipeId given use cooked flow, else history entry only (the agent may create_recipe first when the meal deserves to be in the cookbook)
 - `set_feedback({recipeId, feedback, note})`, `set_in_week({recipeId, inWeek})`, `dismiss_recipe({recipeId})`
+- `add_shopping_items({items: [{name, amount?}]})`: adds manual, non-recipe items to the shared
+  shopping list (e.g. "add milk and eggs to the list"); each item's aisle is auto-classified the same
+  way as the `POST /api/shopping-items` route.
 Each successful mutating tool call adds an `actions` chip (e.g. `{type:'preferences', label:'Updated dislikes: less zucchini'}`)
 and flips the matching `changed` flag in the response.
+
+### Ask about a recipe (`services/recipeAsk.js`)
+Separate from editing: `POST /api/recipes/:id/ask` answers a question about one recipe (the recipe
+JSON + shared context + prior turns from `history`) without ever mutating it. Short, practical,
+conversational answers; `OPENAI_MODEL` with `reasoning: { effort: 'low' }` (no structured-output
+schema needed, just a text answer). The client keeps the Q&A thread in component state for the open
+recipe sheet only and resends it as `history` on each follow-up.
 
 ### Learning (`services/reflect.js`)
 Feedback events = thumbs up/down (with or without note), cooked with rating, chat-logged meals.
@@ -210,9 +264,14 @@ App name **Two Pans**, emoji icon 🍳 (generate PNG icons 32/180/192/512). Warm
    1-line description, chips (⏱ 25 min, 🍳 2 pans, cuisine). Quick actions on the card:
    👎 (dismiss, optional reason prompt via small sheet with skip), 👍, "+ Week" toggle, "Cooked ✓".
    Small "Clear untouched" link. Cookbook shows saved recipes with cookedCount / last cooked.
-2. **Week**: recipes picked for this week (remove / cooked buttons) + merged shopping list
-   grouped by aisle with checkboxes (check state in localStorage; "Reset checks" button).
-   Empty state nudges to Ideas.
+2. **Week**: recipes picked for this week (remove / cooked buttons) + one combined, store-ordered
+   shopping list (recipe ingredients merged with manual items, see below), grouped by aisle in AH
+   Haarlemmerplein walking order. "Other groceries": a quick-add input (type + Enter/Add; `milk x2`
+   parses to name "milk" + amount "x2") sits above the list; manual items are visually distinct
+   (italic, no recipe caption, a small aisle picker, a × to delete) and their checked state is
+   server-side ("Clear checked" removes checked manual items) vs. recipe-ingredient checks which
+   stay in localStorage ("Reset checks"). Works as a general grocery list with no recipes picked;
+   empty state only shows when there is truly nothing (no week recipes AND no manual items).
 3. **Chat**: conversation with the agent. Quick-prompt chips when empty: "Give me 5 ideas for this week",
    "We cooked …", "Less of …". Shows action chips under assistant replies. Sending shows typing indicator.
    After a reply with `changed` flags, refresh the affected data. "New conversation" button.
@@ -222,9 +281,16 @@ App name **Two Pans**, emoji icon 🍳 (generate PNG icons 32/180/192/512). Warm
    Shopping / Learned from feedback), Save button, hint "or just tell the chat". Recent changes list.
 
 **Recipe detail** (full-screen sheet from any list): emoji + title, description, chips, Ingredients
-(amount + name + note), numbered Steps. Actions: +Week toggle, 👍/👎, Cooked it (sheet: rating
-up/meh/down, note, date), Edit (form: title, emoji, ingredients one per line as `amount | name | aisle`,
-steps one per line), and an "Ask AI to change this" input (with "save as variation" checkbox).
+(amount + name + note, with a small muted "where to find it" line when set), numbered Steps, a Tips
+section after Steps (only shown when non-empty). Actions: +Week toggle, 👍/👎, Cooked it (sheet:
+rating up/meh/down, note, date), Edit (form: title, emoji, ingredients one per line as
+`amount | name | aisle | where`, steps one per line, tips one per line), and an "Ask AI" box with a
+small segmented toggle:
+- **Ask** (default): a question input + small Q&A thread (component state, this sheet only; prior
+  turns resent as `history` so follow-ups work); never changes the recipe. A tiny "Apply this as a
+  change" link under each answer switches to Change mode with the instruction pre-filled.
+- **Change**: the original ai-edit flow (instruction input, "save as variation" checkbox, "Apply
+  change" button).
 
 Auth: access-code gate screen (stores token in localStorage). Visiting `/?code=<APP_TOKEN>` logs in
 automatically and strips the param (so Thomas can send Lote one link). Client HTTP timeout ≥ 120 s.

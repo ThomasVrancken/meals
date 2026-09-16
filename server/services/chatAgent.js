@@ -6,6 +6,7 @@ const { RECIPE_CONTENT_SCHEMA, normalizeAiContent, buildRecipeDoc } = require('.
 const { amsterdamDate } = require('../http');
 const { generateSuggestions } = require('./generate');
 const { editRecipe } = require('./recipeEdit');
+const { classifyItemAisle } = require('./classifyAisle');
 const recipesService = require('./recipes');
 
 // Tool-using chat agent (Responses API function calling). It acts
@@ -183,6 +184,30 @@ const TOOLS = [
       required: ['recipeId'],
     },
   },
+  {
+    name: 'add_shopping_items',
+    description:
+      'Add manual items to the shared shopping list (e.g. "add milk and eggs to the list"). Separate from recipe ingredients; shows in the Week tab\'s "Other groceries" section.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              name: { type: 'string' },
+              amount: nullableString('Optional amount/note, e.g. "x2" or "1 bag", else null'),
+            },
+            required: ['name', 'amount'],
+          },
+        },
+      },
+      required: ['items'],
+    },
+  },
 ].map((t) => ({ type: 'function', strict: true, ...t }));
 
 // ---------------------------------------------------------------------------
@@ -236,6 +261,8 @@ Other:
 - Opinions on a specific recipe ("the gnocchi idea looks great", "that curry was bland") -> set_feedback.
 - "Put X in the week" / "take Y off the list" -> set_in_week. "Get rid of X" -> dismiss_recipe.
 - "Make the red sauce spicier" (a change to an existing recipe) -> edit_recipe.
+- "Add milk/eggs/whatever to the shopping list" -> add_shopping_items. This is for loose groceries, not
+  recipe ingredients; don't use it to add things that belong in a recipe.
 
 ${HOUSE_STYLE}
 `.trim();
@@ -395,6 +422,27 @@ function createToolRunner(state) {
       addAction({ type: 'recipe', label: `Dismissed ${recipe.title}`, recipeId: recipe.id });
       return { recipe: compact(recipe) };
     },
+
+    async add_shopping_items({ items }) {
+      const list = Array.isArray(items) ? items : [];
+      const created = [];
+      for (const it of list) {
+        if (!it || typeof it.name !== 'string' || !it.name.trim()) continue;
+        const name = it.name.trim().slice(0, 200);
+        const aisle = await classifyItemAisle(name);
+        const item = await store.createShoppingItem({
+          name,
+          amount: (it.amount && String(it.amount).trim().slice(0, 100)) || null,
+          aisle,
+        });
+        created.push(item);
+      }
+      if (created.length) {
+        flag('shopping');
+        addAction({ type: 'shopping', label: `Added to list: ${created.map((i) => i.name).join(', ')}` });
+      }
+      return { created: created.map((i) => ({ id: i.id, name: i.name, amount: i.amount })) };
+    },
   };
 }
 
@@ -436,7 +484,10 @@ function historyToInput(messages) {
  */
 async function runChat(message) {
   const [previous, { text: context }] = await Promise.all([store.listChat(CHAT_HISTORY_MESSAGES), buildContext()]);
-  const state = { actions: [], changed: { recipes: false, week: false, history: false, preferences: false } };
+  const state = {
+    actions: [],
+    changed: { recipes: false, week: false, history: false, preferences: false, shopping: false },
+  };
   const runner = createToolRunner(state);
   const instructions = `${INSTRUCTIONS}\n\n${context}`;
   const base = {

@@ -18,6 +18,7 @@ const ACTION_LABELS = {
   week: '🗓️',
   history: '📝',
   feedback: '👍',
+  shopping: '🛒',
 }
 
 function actionEmoji(type) {

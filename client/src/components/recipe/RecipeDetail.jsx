@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ThumbsUp, ThumbsDown, Plus, Check, Pencil, Sparkles, Clock, CookingPot } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Plus, Check, Pencil, Sparkles, Clock, CookingPot, ArrowUp } from 'lucide-react'
 import { Sheet } from '../common/Sheet'
 import { Chip } from '../common/Chip'
-import { LoadingPanel } from '../common/LoadingDots'
+import { LoadingPanel, LoadingDots } from '../common/LoadingDots'
 import { DismissSheet } from './DismissSheet'
 import { CookedSheet } from './CookedSheet'
 import { EditRecipeForm } from './EditRecipeForm'
@@ -18,11 +18,17 @@ export function RecipeDetail({ recipeId, onClose }) {
   const [savingEdit, setSavingEdit] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  const [aiMode, setAiMode] = useState('ask') // ask | change
   const [aiInstruction, setAiInstruction] = useState('')
   const [asVariation, setAsVariation] = useState(false)
   const [aiBusy, setAiBusy] = useState(false)
   const [aiSummary, setAiSummary] = useState(null)
   const [aiError, setAiError] = useState(null)
+
+  const [askThread, setAskThread] = useState([]) // [{role:'user'|'assistant', text}], this sheet only
+  const [askInput, setAskInput] = useState('')
+  const [askBusy, setAskBusy] = useState(false)
+  const [askError, setAskError] = useState(null)
 
   const recipe = useMemo(() => recipes.find((r) => r.id === recipeId) || fetched, [recipes, fetched, recipeId])
 
@@ -111,6 +117,31 @@ export function RecipeDetail({ recipeId, onClose }) {
     }
   }
 
+  const submitAsk = async () => {
+    const question = askInput.trim()
+    if (!question || askBusy) return
+    setAskInput('')
+    setAskBusy(true)
+    setAskError(null)
+    const priorHistory = askThread
+    setAskThread((prev) => [...prev, { role: 'user', text: question }])
+    try {
+      const { answer } = await api.askRecipe(recipe.id, { question, history: priorHistory })
+      setAskThread((prev) => [...prev, { role: 'assistant', text: answer }])
+    } catch (err) {
+      setAskError(err.message || 'Could not get an answer. Try again.')
+    } finally {
+      setAskBusy(false)
+    }
+  }
+
+  const applyAsChange = (text) => {
+    setAiMode('change')
+    setAiInstruction(text)
+    setAiError(null)
+    setAiSummary(null)
+  }
+
   return (
     <Sheet onClose={onClose} full>
       {mode === 'edit' ? (
@@ -189,12 +220,15 @@ export function RecipeDetail({ recipeId, onClose }) {
             <h2 className="text-base font-bold text-ink-800 mb-2">Ingredients</h2>
             <div className="bg-white rounded-2xl shadow-card divide-y divide-ink-50 overflow-hidden">
               {(recipe.ingredients || []).map((ing, i) => (
-                <div key={i} className="px-4 py-2.5 flex items-baseline gap-2">
-                  <span className="text-sm font-semibold text-ink-700 shrink-0 min-w-[64px]">{ing.amount}</span>
-                  <span className="text-sm text-ink-700">
-                    {ing.name}
-                    {ing.note && <span className="text-ink-400"> · {ing.note}</span>}
-                  </span>
+                <div key={i} className="px-4 py-2.5">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-semibold text-ink-700 shrink-0 min-w-[64px]">{ing.amount}</span>
+                    <span className="text-sm text-ink-700">
+                      {ing.name}
+                      {ing.note && <span className="text-ink-400"> · {ing.note}</span>}
+                    </span>
+                  </div>
+                  {ing.where && <p className="text-xs text-ink-400 mt-0.5 pl-[72px]">📍 {ing.where}</p>}
                 </div>
               ))}
             </div>
@@ -214,11 +248,108 @@ export function RecipeDetail({ recipeId, onClose }) {
             </ol>
           </div>
 
+          {recipe.tips && recipe.tips.length > 0 && (
+            <div className="mt-6">
+              <h2 className="text-base font-bold text-ink-800 mb-2">Tips</h2>
+              <div className="bg-white rounded-2xl shadow-card divide-y divide-ink-50 overflow-hidden">
+                {recipe.tips.map((tip, i) => (
+                  <p key={i} className="px-4 py-2.5 text-sm text-ink-700 leading-relaxed">
+                    💡 {tip}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-7">
             <h2 className="text-base font-bold text-ink-800 mb-2 flex items-center gap-1.5">
-              <Sparkles size={16} className="text-tomato-500" /> Ask AI to change this
+              <Sparkles size={16} className="text-tomato-500" /> Ask AI
             </h2>
-            {aiBusy ? (
+
+            <div className="flex bg-ink-50 rounded-xl p-1 mb-3">
+              <button
+                type="button"
+                onClick={() => setAiMode('ask')}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  aiMode === 'ask' ? 'bg-white shadow-card text-ink-800' : 'text-ink-400'
+                }`}
+              >
+                Ask
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiMode('change')}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  aiMode === 'change' ? 'bg-white shadow-card text-ink-800' : 'text-ink-400'
+                }`}
+              >
+                Change
+              </button>
+            </div>
+
+            {aiMode === 'ask' ? (
+              <div>
+                {askThread.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {askThread.map((m, i) => (
+                      <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className="max-w-[90%]">
+                          <div
+                            className={`rounded-2xl px-3.5 py-2 text-sm leading-snug whitespace-pre-wrap ${
+                              m.role === 'user'
+                                ? 'bg-tomato-500 text-white rounded-br-md'
+                                : 'bg-white text-ink-800 shadow-card rounded-bl-md'
+                            }`}
+                          >
+                            {m.text}
+                          </div>
+                          {m.role === 'assistant' && (
+                            <button
+                              onClick={() => applyAsChange(askThread[i - 1]?.text || m.text)}
+                              className="mt-1 text-xs font-medium text-tomato-600 underline underline-offset-2"
+                            >
+                              Apply this as a change
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {askBusy && (
+                  <div className="flex justify-start mb-3">
+                    <div className="bg-white shadow-card rounded-2xl rounded-bl-md px-4 py-3 text-ink-400">
+                      <LoadingDots />
+                    </div>
+                  </div>
+                )}
+                {askError && <p className="text-tomato-600 text-xs mb-2">{askError}</p>}
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={askInput}
+                    onChange={(e) => setAskInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        submitAsk()
+                      }
+                    }}
+                    placeholder="e.g. can I use chicken breast instead?"
+                    rows={1}
+                    disabled={askBusy}
+                    className="flex-1 bg-white border border-ink-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tomato-400 resize-none max-h-28 disabled:opacity-60"
+                  />
+                  <button
+                    onClick={submitAsk}
+                    disabled={!askInput.trim() || askBusy}
+                    aria-label="Send"
+                    className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-tomato-500 text-white active:bg-tomato-600 disabled:opacity-40"
+                  >
+                    <ArrowUp size={18} />
+                  </button>
+                </div>
+              </div>
+            ) : aiBusy ? (
               <LoadingPanel message="Rewriting the recipe…" sub="Usually takes 10–30 seconds." />
             ) : (
               <>

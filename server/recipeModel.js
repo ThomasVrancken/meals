@@ -1,21 +1,9 @@
 const { badRequest } = require('./http');
+const { AISLE_KEYS, coerceAisle } = require('./aisles');
 
 // Recipe shape, JSON schemas for structured LLM output, and validation /
 // normalisation shared by the routes (manual edits), AI services and the
 // chat agent's create_recipe tool.
-
-// Walking order through the shop; also the order of the shopping list.
-const AISLES = [
-  'produce',
-  'meat-fish',
-  'dairy-eggs',
-  'pasta-rice-noodles',
-  'sauces-spices',
-  'canned-jars',
-  'frozen',
-  'bakery',
-  'other',
-];
 
 const STATUSES = ['suggested', 'saved', 'dismissed'];
 const FEEDBACK = ['up', 'down'];
@@ -43,13 +31,24 @@ const RECIPE_CONTENT_SCHEMA = {
         properties: {
           name: { type: 'string', description: 'Ingredient, with Dutch/AH product name in parentheses when helpful' },
           amount: { type: 'string', description: 'Supermarket pack amount, e.g. "1 bag (400 g)"' },
-          aisle: { type: 'string', enum: AISLES },
+          aisle: { type: 'string', enum: AISLE_KEYS },
           note: { type: ['string', 'null'], description: 'Very short optional note, else null' },
+          where: {
+            type: ['string', 'null'],
+            description:
+              'Short store-section hint for non-obvious items only, e.g. "World food aisle, Asian section" or "Chilled section near fresh pasta". Null for obvious items (pasta, rice, minced beef, milk, eggs, plain vegetables).',
+          },
         },
-        required: ['name', 'amount', 'aisle', 'note'],
+        required: ['name', 'amount', 'aisle', 'note', 'where'],
       },
     },
     steps: { type: 'array', items: { type: 'string' }, description: '3-6 short imperative steps' },
+    tips: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        '0-3 short, genuinely useful tips (e.g. order-of-operations, how long leftovers keep, a smart swap). Never generic seasoning fluff like "season with salt and pepper". Empty array if nothing worth saying.',
+    },
   },
   required: [
     'title',
@@ -62,6 +61,7 @@ const RECIPE_CONTENT_SCHEMA = {
     'pans',
     'ingredients',
     'steps',
+    'tips',
   ],
 };
 
@@ -129,8 +129,9 @@ function normalizeAiContent(raw) {
     .map((i) => ({
       name: str(i && i.name),
       amount: str(i && i.amount),
-      aisle: AISLES.includes(i && i.aisle) ? i.aisle : null,
+      aisle: AISLE_KEYS.includes(i && i.aisle) ? i.aisle : null,
       note: str(i && i.note) || null,
+      where: str(i && i.where) || null,
     }))
     .filter((i) => i.name && !isBasicSeasoning(i.name));
   if (ingredients.length < 2) return { ok: false, reason: `${title}: too few ingredients` };
@@ -141,6 +142,7 @@ function normalizeAiContent(raw) {
   if (!Number.isFinite(timeMinutes) || timeMinutes < 5 || timeMinutes > 120) {
     return { ok: false, reason: `${title}: bad timeMinutes` };
   }
+  const tips = (Array.isArray(raw.tips) ? raw.tips : []).map(str).filter(Boolean).slice(0, 3);
   return {
     ok: true,
     content: {
@@ -157,6 +159,7 @@ function normalizeAiContent(raw) {
       pans,
       ingredients,
       steps,
+      tips,
     },
   };
 }
@@ -225,18 +228,24 @@ function validateManualContent(body, { partial = false } = {}) {
       if (i.amount !== undefined && i.amount !== null && typeof i.amount !== 'string') {
         throw badRequest(`ingredients[${idx}].amount must be a string`);
       }
-      const aisle = i.aisle === undefined || i.aisle === null || i.aisle === '' ? 'other' : i.aisle;
-      if (!AISLES.includes(aisle)) {
-        throw badRequest(`ingredients[${idx}].aisle must be one of: ${AISLES.join(', ')}`);
+      // Accepts a valid new-taxonomy key, or silently maps a recognised old key (pre-migration
+      // data / stale clients) to its new equivalent; a genuinely unknown value is rejected.
+      const aisle = coerceAisle(i.aisle);
+      if (!aisle) {
+        throw badRequest(`ingredients[${idx}].aisle must be one of: ${AISLE_KEYS.join(', ')}`);
       }
       if (i.note !== undefined && i.note !== null && typeof i.note !== 'string') {
         throw badRequest(`ingredients[${idx}].note must be a string or null`);
+      }
+      if (i.where !== undefined && i.where !== null && typeof i.where !== 'string') {
+        throw badRequest(`ingredients[${idx}].where must be a string or null`);
       }
       return {
         name: i.name.trim(),
         amount: (i.amount || '').trim(),
         aisle,
         note: (i.note && i.note.trim()) || null,
+        where: (i.where && i.where.trim()) || null,
       };
     });
   }
@@ -246,6 +255,12 @@ function validateManualContent(body, { partial = false } = {}) {
     }
     out.steps = body.steps.map((s) => s.trim()).filter(Boolean);
   }
+  if (has('tips')) {
+    if (!Array.isArray(body.tips) || body.tips.some((t) => typeof t !== 'string') || body.tips.length > 5) {
+      throw badRequest('tips must be an array of strings (max 5)');
+    }
+    out.tips = body.tips.map((t) => t.trim()).filter(Boolean).slice(0, 3);
+  } else if (!partial) out.tips = [];
   return out;
 }
 
@@ -263,6 +278,7 @@ function buildRecipeDoc(content, meta = {}) {
     pans: content.pans || 2,
     ingredients: content.ingredients || [],
     steps: content.steps || [],
+    tips: content.tips || [],
     status: meta.status || 'suggested',
     inWeek: Boolean(meta.inWeek),
     feedback: meta.feedback || null,
@@ -285,7 +301,6 @@ function contentOf(recipe) {
 }
 
 module.exports = {
-  AISLES,
   STATUSES,
   FEEDBACK,
   RECIPE_CONTENT_SCHEMA,

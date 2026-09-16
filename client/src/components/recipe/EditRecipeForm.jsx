@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
-// Ingredients as `amount | name | aisle` lines, steps as one-per-line.
+// Ingredients as `amount | name | aisle | where` lines (where is optional), steps/tips one-per-line.
 function ingredientsToLines(ingredients = []) {
-  return ingredients.map((i) => `${i.amount || ''} | ${i.name || ''} | ${i.aisle || 'other'}`).join('\n')
+  return ingredients.map((i) => `${i.amount || ''} | ${i.name || ''} | ${i.aisle || 'misc'} | ${i.where || ''}`).join('\n')
 }
 
 function linesToIngredients(text) {
@@ -11,8 +11,8 @@ function linesToIngredients(text) {
     .map((l) => l.trim())
     .filter(Boolean)
     .map((line) => {
-      const [amount, name, aisle] = line.split('|').map((s) => (s || '').trim())
-      return { amount: amount || '', name: name || line, aisle: aisle || 'other' }
+      const [amount, name, aisle, where] = line.split('|').map((s) => (s || '').trim())
+      return { amount: amount || '', name: name || line, aisle: aisle || 'misc', where: where || null }
     })
 }
 
@@ -33,6 +33,7 @@ export function EditRecipeForm({ recipe, onCancel, onSave, saving }) {
   const [description, setDescription] = useState(recipe.description || '')
   const [ingredientsText, setIngredientsText] = useState(ingredientsToLines(recipe.ingredients))
   const [stepsText, setStepsText] = useState(stepsToLines(recipe.steps))
+  const [tipsText, setTipsText] = useState(stepsToLines(recipe.tips))
 
   const submit = (e) => {
     e.preventDefault()
@@ -42,6 +43,7 @@ export function EditRecipeForm({ recipe, onCancel, onSave, saving }) {
       description: description.trim(),
       ingredients: linesToIngredients(ingredientsText),
       steps: linesToSteps(stepsText),
+      tips: linesToSteps(tipsText).slice(0, 3),
     })
   }
 
@@ -78,7 +80,10 @@ export function EditRecipeForm({ recipe, onCancel, onSave, saving }) {
 
       <div>
         <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
-          Ingredients <span className="normal-case font-normal text-ink-400">(one per line: amount | name | aisle)</span>
+          Ingredients{' '}
+          <span className="normal-case font-normal text-ink-400">
+            (one per line: amount | name | aisle | where to find it, optional)
+          </span>
         </label>
         <textarea
           value={ingredientsText}
@@ -96,6 +101,19 @@ export function EditRecipeForm({ recipe, onCancel, onSave, saving }) {
           value={stepsText}
           onChange={(e) => setStepsText(e.target.value)}
           rows={6}
+          className="w-full bg-white border border-ink-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tomato-400 resize-none"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-ink-500 mb-1.5 uppercase tracking-wide">
+          Tips <span className="normal-case font-normal text-ink-400">(one per line, optional, max 3)</span>
+        </label>
+        <textarea
+          value={tipsText}
+          onChange={(e) => setTipsText(e.target.value)}
+          rows={3}
+          placeholder="e.g. Leftovers keep 2 days; great for lunch"
           className="w-full bg-white border border-ink-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tomato-400 resize-none"
         />
       </div>

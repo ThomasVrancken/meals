@@ -3,6 +3,7 @@ const store = require('../db');
 const recipes = require('../services/recipes');
 const { generateSuggestions } = require('../services/generate');
 const { editRecipe } = require('../services/recipeEdit');
+const { askAboutRecipe } = require('../services/recipeAsk');
 const { badRequest, notFound } = require('../http');
 
 const router = express.Router();
@@ -71,6 +72,24 @@ router.post('/:id/ai-edit', async (req, res) => {
     source: 'ai',
   });
   res.json({ recipe, summary });
+});
+
+router.post('/:id/ask', async (req, res) => {
+  const body = req.body || {};
+  if (typeof body.question !== 'string' || !body.question.trim()) throw badRequest('question is required');
+  if (body.question.length > 1000) throw badRequest('question is too long (max 1000 chars)');
+  let history = [];
+  if (body.history !== undefined && body.history !== null) {
+    if (!Array.isArray(body.history) || body.history.length > 20) throw badRequest('history must be an array (max 20)');
+    history = body.history.map((h, idx) => {
+      if (!h || typeof h !== 'object' || typeof h.text !== 'string' || !['user', 'assistant'].includes(h.role)) {
+        throw badRequest(`history[${idx}] must be {role: 'user'|'assistant', text: string}`);
+      }
+      return { role: h.role, text: h.text.slice(0, 2000) };
+    });
+  }
+  const { answer } = await askAboutRecipe(req.params.id, { question: body.question.trim(), history });
+  res.json({ answer });
 });
 
 router.post('/:id/cooked', async (req, res) => {

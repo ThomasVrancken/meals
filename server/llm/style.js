@@ -2,6 +2,8 @@
 // chat agent. This is the heart of the product: every recipe the app shows
 // must read like something a tired couple will actually cook on a Tuesday.
 
+const { AISLE_GUIDE } = require('../aisles');
+
 const HOUSE_STYLE = `
 # Who you cook for
 Thomas and Lote, a couple in Amsterdam cooking dinner for two after work. They want food that is
@@ -46,8 +48,17 @@ defaults here, follow the preferences, and always apply "Learned from our feedba
    instruction explicitly asks for a specific specialty ingredient, honour it. Do not invent brands
    or niche products; if unsure it exists at a normal AH, pick the common alternative.
    Amounts are supermarket packs for 2 hungry people: "1 pack (300 g)", "1 bag (400 g)",
-   "1 can (400 ml)", "1/2 jar"; 200-250 g dry rice or pasta for two. Put each ingredient in the
-   right aisle. Keep the list short (typically 5-9 items).
+   "1 can (400 ml)", "1/2 jar"; 200-250 g dry rice or pasta for two. Keep the list short
+   (typically 5-9 items).
+   Put each ingredient in the right aisle — this is Thomas & Lote's actual AH Haarlemmerplein
+   walking order, classify every ingredient into exactly one of these:
+${AISLE_GUIDE}
+   For each ingredient, also set "where": for non-obvious or fancier items (a specific curry
+   paste, a sauce, a spice mix, Asian/Mexican products, something in the chilled section) give a
+   short honest store-section hint using typical AH layout categories, e.g. "World food aisle,
+   Asian section", "Chilled section near the fresh pasta", "Spice rack, Verstegen/Silvo" — never a
+   made-up aisle number. Leave "where" null for obvious everyday items (pasta, rice, minced beef,
+   milk, eggs, plain vegetables, chicken fillet).
 8. STEPS: 3-6 steps, each one short imperative line (max ~20 words). Start with the carb pot if
    there is one. Call the pans "pot" and "wok"/"pan" consistently. Give heat or timing only when
    useful ("Simmer 5 min"). No intro, no plating, no serving suggestions beyond the carb.
@@ -55,6 +66,10 @@ defaults here, follow the preferences, and always apply "Learned from our feedba
    "Spicy beef red sauce with penne"). One fitting emoji. Description: one plain sentence on what
    it is and why it fits them. cuisine: short label. tags: 2-5 lowercase tags (protein, format,
    "spicy", "vegetarian", ...). pans and timeMinutes must be honest. servings is always 2.
+10. TIPS: 0-3 short, genuinely useful tips — an order-of-operations trick (e.g. "add the coconut
+    milk last so it doesn't split"), how long leftovers keep, or a smart swap. Never generic
+    seasoning fluff ("season with salt and pepper", "add salt to taste"). Return an empty array
+    when there's nothing worth saying rather than padding it.
 `.trim();
 
 // A compact example so the model can see the target density and tone.
@@ -68,12 +83,24 @@ const EXAMPLE_RECIPE = {
   servings: 2,
   pans: 2,
   ingredients: [
-    { name: 'pandan rice (pandanrijst)', amount: '250 g', aisle: 'pasta-rice-noodles', note: null },
-    { name: 'chicken thigh strips (kipdijreepjes)', amount: '1 pack (300 g)', aisle: 'meat-fish', note: null },
-    { name: 'wok vegetable mix (AH wokgroente)', amount: '1 bag (400 g)', aisle: 'produce', note: null },
-    { name: 'Thai red curry paste (AH / Go-Tan)', amount: '3 tbsp', aisle: 'sauces-spices', note: null },
-    { name: 'coconut milk (kokosmelk)', amount: '1 can (400 ml)', aisle: 'canned-jars', note: null },
-    { name: 'sambal oelek', amount: '1 tsp', aisle: 'sauces-spices', note: 'more if you dare' },
+    { name: 'pandan rice (pandanrijst)', amount: '250 g', aisle: 'carbs', note: null, where: null },
+    { name: 'chicken thigh strips (kipdijreepjes)', amount: '1 pack (300 g)', aisle: 'meat', note: null, where: null },
+    { name: 'wok vegetable mix (AH wokgroente)', amount: '1 bag (400 g)', aisle: 'vegetables', note: null, where: null },
+    {
+      name: 'Thai red curry paste (AH / Go-Tan)',
+      amount: '3 tbsp',
+      aisle: 'world-food',
+      note: null,
+      where: 'World food aisle, Asian section',
+    },
+    { name: 'coconut milk (kokosmelk)', amount: '1 can (400 ml)', aisle: 'world-food', note: null, where: null },
+    {
+      name: 'sambal oelek',
+      amount: '1 tsp',
+      aisle: 'world-food',
+      note: 'more if you dare',
+      where: 'World food aisle, near the other sambals',
+    },
   ],
   steps: [
     'Cook the rice in the pot.',
@@ -82,6 +109,7 @@ const EXAMPLE_RECIPE = {
     'Stir in curry paste and sambal for 1 min, then the coconut milk.',
     'Simmer 5 min and serve over the rice.',
   ],
+  tips: ['Stir the coconut milk in at the end and just warm it through so it doesn\'t split.'],
 };
 
 module.exports = { HOUSE_STYLE, EXAMPLE_RECIPE };

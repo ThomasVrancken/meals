@@ -60,6 +60,7 @@ const SEED_PREFERENCES = {
     '- All groceries at Albert Heijn "AH Haarlemmerplein", Haarlemmerplein 34, 1013 HS Amsterdam (a regular city-centre AH, not an XL).',
     '- Only use ingredients reliably stocked at a regular Albert Heijn in the Netherlands. Prefer AH own-brand / common Dutch supermarket products, and give the Dutch product name in parentheses when it helps find it (e.g. "Thai red curry paste (AH / Go-Tan)", "kipdijfilet").',
     '- Cooking for 2 people (Thomas and Lote). Standard supermarket pack sizes (e.g. "1 bag (400 g)").',
+    '- For less common products (specific pastes, sauces, spices, Asian/Mexican items), say where to find them in the AH store (e.g. world food aisle, chilled section).',
   ].join('\n'),
   learned: '',
 };
@@ -259,6 +260,57 @@ async function clearChat() {
 }
 
 // ---------------------------------------------------------------------------
+// Shopping items (manual, non-recipe groceries shared by both phones)
+
+const byCreatedAsc = (a, b) => String(a.createdAt).localeCompare(String(b.createdAt));
+
+async function listShoppingItems() {
+  const snap = await col('shoppingItems').get();
+  return snap.docs.map(withId).sort(byCreatedAsc);
+}
+
+async function getShoppingItem(id) {
+  if (typeof id !== 'string' || !id || id.includes('/')) return null;
+  const snap = await col('shoppingItems').doc(id).get();
+  return snap.exists ? withId(snap) : null;
+}
+
+async function createShoppingItem({ name, amount = null, aisle = 'misc' }) {
+  const ref = col('shoppingItems').doc();
+  const now = nowIso();
+  const data = { id: ref.id, name, amount: amount || null, aisle: aisle || 'misc', checked: false, createdAt: now, updatedAt: now };
+  await ref.set(data);
+  return data;
+}
+
+async function updateShoppingItem(id, patch) {
+  const ref = col('shoppingItems').doc(id);
+  const data = { ...patch, updatedAt: nowIso() };
+  delete data.id;
+  await ref.update(data);
+  return withId(await ref.get());
+}
+
+async function deleteShoppingItem(id) {
+  await col('shoppingItems').doc(id).delete();
+}
+
+/** Delete every checked item. Returns the number deleted. */
+async function clearCheckedShoppingItems() {
+  const snap = await col('shoppingItems').where('checked', '==', true).get();
+  let n = 0;
+  for (let i = 0; i < snap.docs.length; i += 400) {
+    const batch = db().batch();
+    snap.docs.slice(i, i + 400).forEach((d) => {
+      batch.delete(d.ref);
+      n++;
+    });
+    await batch.commit();
+  }
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Counters
 
 const countersRef = () => col('meta').doc('counters');
@@ -320,6 +372,12 @@ module.exports = {
   listChat,
   addChatMessage,
   clearChat,
+  listShoppingItems,
+  getShoppingItem,
+  createShoppingItem,
+  updateShoppingItem,
+  deleteShoppingItem,
+  clearCheckedShoppingItems,
   incrementFeedbackCounter,
   claimReflection,
   getCounters,

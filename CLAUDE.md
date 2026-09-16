@@ -15,19 +15,31 @@ Code sessions.
     `COLLECTION_PREFIX`), preference seeding/history, feedback counters.
   - `server/recipeModel.js` — recipe JSON schema (for structured LLM output), validation,
     normalisation (drops seasoning fluff like salt/oil/water), `buildRecipeDoc`.
+  - `server/aisles.js` — the shopping-list "aisle" taxonomy (key, label, walking `order`,
+    `description` for LLM prompts): 15 keys matching Thomas & Lote's actual walking order through
+    AH Haarlemmerplein. Single source of truth, imported by `recipeModel.js` (ingredient schema),
+    `llm/style.js` (prompt guide), `services/shoppingList.js` (grouping/sort), `services/
+    classifyAisle.js` (manual item classification) and `scripts/migrate-aisles.js`. Also holds
+    `OLD_TO_NEW_AISLE` (pre-2026-09 9-key taxonomy → new key) and `normalizeAisle` (lenient,
+    never-fails version used at read time as a safety net for unmigrated data).
   - `server/llm/openai.js` — thin Responses API wrapper: one retry on 5xx/timeout, structured
     JSON helper, `LLMError` (502) with safe messages, key redaction.
   - `server/llm/context.js` — builds the shared "who we are / what we ate" context block
     every AI call gets (preferences, last 60 days history, liked/disliked recipes, current
     suggestions/week).
   - `server/llm/style.js` — `HOUSE_STYLE`: the actual recipe-writing rules (≤2 pans, pre-cut
-    veg, no seasoning fluff, mainstream-AH-only ingredients). This is the file to edit when
-    recipes feel off-brand — it's shared by generation, edits and the chat agent.
+    veg, no seasoning fluff, mainstream-AH-only ingredients, the aisle guide, ingredient `where`
+    hints, recipe `tips`). This is the file to edit when recipes feel off-brand — it's shared by
+    generation, edits and the chat agent.
   - `server/services/*.js` — `generate.js` (batch suggestions), `recipeEdit.js` (AI-edit one
-    recipe), `chatAgent.js` (tool-using agent loop, max 8 rounds), `reflect.js` (background
-    "learned" notes rewrite, fires after 3 feedback events), `shoppingList.js` (deterministic,
-    no LLM), `recipes.js` (shared status/feedback/cooked semantics used by routes + chat tools).
-  - `server/routes/*.js` — thin, delegate to `services/`.
+    recipe), `recipeAsk.js` (answer a question about one recipe, never mutates it), `classifyAisle.js`
+    (tiny fast-model call to classify one manual grocery item's aisle, always falls back to `misc`),
+    `chatAgent.js` (tool-using agent loop, max 8 rounds, incl. `add_shopping_items`), `reflect.js`
+    (background "learned" notes rewrite, fires after 3 feedback events), `shoppingList.js`
+    (deterministic, no LLM, groups by `aisles.js` order), `recipes.js` (shared status/feedback/cooked
+    semantics used by routes + chat tools).
+  - `server/routes/*.js` — thin, delegate to `services/`. `shoppingItems.js` is the manual
+    "Other groceries" CRUD (classifies aisle on create).
 - `client/`: React 18 + Vite + Tailwind 3 PWA, own `package.json`, builds to `client/dist`
   (served by the Express server, not a separate static host).
   - `client/src/context/DataContext.jsx` — shared data layer (recipes/week/history/prefs) so
@@ -91,7 +103,28 @@ unprefixed root, which is where the newsfeed's own collections could plausibly c
 depending on its naming (they don't today, but there's no schema-level guard — the prefix
 *is* the guard).
 
+## Aisle taxonomy migration (2026-09)
+
+The shopping-list `aisle` enum was replaced with a 15-key taxonomy matching the actual walking
+order through AH Haarlemmerplein (`server/aisles.js`; see `SPEC.md` for the full table), up from a
+generic 9-key one. Existing data written before this used the old keys; `scripts/migrate-aisles.js`
+reclassifies a prefix's recipes in place (one fast-model call per recipe, static
+`OLD_TO_NEW_AISLE` fallback per-ingredient on any failure), always backing up the full `recipes`
+collection to `backups/<prefix>recipes-<timestamp>.json` (gitignored) first. Run
+`--dry-run` before a real run, and prod (`--prefix=meals_`) additionally needs `--yes-prod` to
+write. The server tolerates old keys at read time regardless (`normalizeAisle`), so a stale
+document never crashes or vanishes from the list — the migration is about correctness/consistency,
+not a hard requirement for the app to function.
+
 ## Gotchas hit while integrating (this session)
+
+- **Live browser UI testing of the authenticated PWA was not done this session.** The sandbox's
+  safety layer treats the shared `APP_TOKEN` as a credential and blocks agent-driven browser flows
+  that would authenticate with it, so a future session automating the real logged-in UI should
+  expect the same and plan around it (e.g. ask the user to drive that part, or verify through the
+  API/component code instead). UI changes were verified via `npm run build`, the API test suite,
+  real (non-browser) LLM calls against the dev server, and a static visual mockup rendered from the
+  actual Tailwind tokens — not a substitute for a real Playwright pass against the logged-in app.
 
 - **Zero client/server contract mismatches found.** The backend (Express/Firestore/OpenAI)
   and frontend (React/Vite PWA) were built by separate agents against `SPEC.md` and had never

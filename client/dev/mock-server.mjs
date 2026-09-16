@@ -82,11 +82,11 @@ let recipes = [
     pans: 2,
     status: 'suggested',
     ingredients: [
-      { name: 'Jasmine rice', amount: '160 g', aisle: 'pasta-rice-noodles' },
-      { name: 'Chicken thigh fillet (kipdijfilet)', amount: '300 g', aisle: 'meat-fish' },
-      { name: 'AH wokgroente', amount: '1 bag (400 g)', aisle: 'produce' },
-      { name: 'Thai green curry paste (AH / Go-Tan)', amount: '4 tbsp', aisle: 'sauces-spices' },
-      { name: 'Coconut milk', amount: '1 can (400 ml)', aisle: 'canned-jars' },
+      { name: 'Jasmine rice', amount: '160 g', aisle: 'carbs' },
+      { name: 'Chicken thigh fillet (kipdijfilet)', amount: '300 g', aisle: 'meat' },
+      { name: 'AH wokgroente', amount: '1 bag (400 g)', aisle: 'vegetables' },
+      { name: 'Thai green curry paste (AH / Go-Tan)', amount: '4 tbsp', aisle: 'world-food' },
+      { name: 'Coconut milk', amount: '1 can (400 ml)', aisle: 'world-food' },
     ],
     steps: [
       'Cook the rice according to the pack.',
@@ -106,11 +106,11 @@ let recipes = [
     pans: 2,
     status: 'suggested',
     ingredients: [
-      { name: 'Pasta (penne)', amount: '250 g', aisle: 'pasta-rice-noodles' },
-      { name: 'Ground beef (rundergehakt)', amount: '300 g', aisle: 'meat-fish' },
-      { name: 'AH Italiaanse groentemix', amount: '1 bag (400 g)', aisle: 'produce' },
-      { name: 'Tomato paste (tomatenpuree)', amount: '1 tube', aisle: 'canned-jars' },
-      { name: 'Dried chili flakes', amount: '1 tsp', aisle: 'sauces-spices' },
+      { name: 'Pasta (penne)', amount: '250 g', aisle: 'carbs' },
+      { name: 'Ground beef (rundergehakt)', amount: '300 g', aisle: 'meat' },
+      { name: 'AH Italiaanse groentemix', amount: '1 bag (400 g)', aisle: 'vegetables' },
+      { name: 'Tomato paste (tomatenpuree)', amount: '1 tube', aisle: 'world-food' },
+      { name: 'Dried chili flakes', amount: '1 tsp', aisle: 'world-food' },
     ],
     steps: [
       'Boil the pasta.',
@@ -130,10 +130,10 @@ let recipes = [
     pans: 2,
     status: 'suggested',
     ingredients: [
-      { name: 'Udon noodles', amount: '2 packs', aisle: 'pasta-rice-noodles' },
-      { name: 'Pork strips (varkenshaas reepjes)', amount: '300 g', aisle: 'meat-fish' },
-      { name: 'AH roerbakgroente', amount: '1 bag (400 g)', aisle: 'produce' },
-      { name: 'Japanese curry roux block', amount: '4 cubes', aisle: 'sauces-spices' },
+      { name: 'Udon noodles', amount: '2 packs', aisle: 'carbs' },
+      { name: 'Pork strips (varkenshaas reepjes)', amount: '300 g', aisle: 'meat' },
+      { name: 'AH roerbakgroente', amount: '1 bag (400 g)', aisle: 'vegetables' },
+      { name: 'Japanese curry roux block', amount: '4 cubes', aisle: 'world-food' },
     ],
     steps: [
       'Heat the udon per pack instructions.',
@@ -157,9 +157,9 @@ let recipes = [
     cookedCount: 4,
     lastCookedAt: '2026-09-01',
     ingredients: [
-      { name: 'Fresh tortellini (spinach & ricotta)', amount: '500 g', aisle: 'pasta-rice-noodles' },
-      { name: 'Cooking cream (kookroom)', amount: '1 pack (200 ml)', aisle: 'dairy-eggs' },
-      { name: 'Grated Parmesan', amount: '40 g', aisle: 'dairy-eggs' },
+      { name: 'Fresh tortellini (spinach & ricotta)', amount: '500 g', aisle: 'carbs' },
+      { name: 'Cooking cream (kookroom)', amount: '1 pack (200 ml)', aisle: 'dairy' },
+      { name: 'Grated Parmesan', amount: '40 g', aisle: 'dairy' },
     ],
     steps: [
       'Boil the tortellini per pack instructions.',
@@ -182,10 +182,10 @@ let recipes = [
     lastCookedAt: '2026-08-20',
     inWeek: true,
     ingredients: [
-      { name: 'Basmati rice', amount: '160 g', aisle: 'pasta-rice-noodles' },
-      { name: 'Chicken breast fillet (kipfilet)', amount: '300 g', aisle: 'meat-fish' },
-      { name: 'Butter chicken paste/sauce (AH / Patak’s)', amount: '1 jar', aisle: 'sauces-spices' },
-      { name: 'Cooking cream (kookroom)', amount: '100 ml', aisle: 'dairy-eggs' },
+      { name: 'Basmati rice', amount: '160 g', aisle: 'carbs' },
+      { name: 'Chicken breast fillet (kipfilet)', amount: '300 g', aisle: 'meat' },
+      { name: 'Butter chicken paste/sauce (AH / Patak’s)', amount: '1 jar', aisle: 'world-food' },
+      { name: 'Cooking cream (kookroom)', amount: '100 ml', aisle: 'dairy' },
     ],
     steps: [
       'Cook the rice.',
@@ -259,15 +259,21 @@ function readBody(req) {
 }
 
 const AISLE_ORDER = [
-  'produce',
-  'meat-fish',
-  'dairy-eggs',
-  'pasta-rice-noodles',
-  'sauces-spices',
-  'canned-jars',
-  'frozen',
-  'bakery',
-  'other',
+  'spices',
+  'fruit',
+  'vegetables',
+  'fresh-meals',
+  'meat',
+  'cheese-deli',
+  'bread',
+  'carbs',
+  'world-food',
+  'cereals',
+  'snacks',
+  'tea',
+  'dairy',
+  'drinks',
+  'misc',
 ]
 
 function normalizeKey(name) {
@@ -284,7 +290,7 @@ function buildShoppingList() {
     for (const ing of r.ingredients || []) {
       const key = normalizeKey(ing.name)
       if (!byKey.has(key)) {
-        byKey.set(key, { aisle: ing.aisle || 'other', name: ing.name, amounts: [], recipes: [] })
+        byKey.set(key, { aisle: ing.aisle || 'misc', name: ing.name, amounts: [], recipes: [] })
       }
       const entry = byKey.get(key)
       if (ing.amount) entry.amounts.push(ing.amount)
@@ -323,10 +329,10 @@ function generateFakeRecipe(hint) {
     pans: Math.random() > 0.5 ? 2 : 1,
     status: 'suggested',
     ingredients: [
-      { name: 'Rice noodles', amount: '200 g', aisle: 'pasta-rice-noodles' },
-      { name: 'AH wokgroente', amount: '1 bag (400 g)', aisle: 'produce' },
-      { name: 'Chicken thigh fillet (kipdijfilet)', amount: '300 g', aisle: 'meat-fish' },
-      { name: 'Store-bought stir-fry sauce', amount: '1 pack', aisle: 'sauces-spices' },
+      { name: 'Rice noodles', amount: '200 g', aisle: 'carbs' },
+      { name: 'AH wokgroente', amount: '1 bag (400 g)', aisle: 'vegetables' },
+      { name: 'Chicken thigh fillet (kipdijfilet)', amount: '300 g', aisle: 'meat' },
+      { name: 'Store-bought stir-fry sauce', amount: '1 pack', aisle: 'world-food' },
     ],
     steps: [
       'Prepare the noodles per pack instructions.',

@@ -29,8 +29,9 @@ ${HOUSE_STYLE}
 # Editing rules
 - Apply the instruction faithfully. If they describe what they actually did, make the recipe match
   reality (ingredients, amounts and the step where it happens).
-- Change only what the instruction implies; keep the rest (wording, amounts, order) as is. Follow-on
-  changes are fine when needed (e.g. tofu cooks differently than chicken, adjust that step).
+- Change only what the instruction implies; keep the rest (wording, amounts, order, tips, ingredient
+  "where" hints) as is. Follow-on changes are fine when needed (e.g. tofu cooks differently than
+  chicken, adjust that step; a new ingredient needs its own aisle and "where" if non-obvious).
 - The house rules still apply to the result: ≤2 pans, no salt/pepper/oil/water, 3-6 short steps.
   If the instruction itself conflicts with a rule (e.g. "use the oven"), do what they ask.
 - Update title/emoji/description/tags only when the dish meaningfully changed (e.g. a new protein).

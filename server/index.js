@@ -28,6 +28,7 @@ app.use('/api/week', require('./routes/week'));
 app.use('/api/history', require('./routes/history'));
 app.use('/api/preferences', require('./routes/preferences'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/shopping-items', require('./routes/shoppingItems'));
 app.use('/api', (req, res) => res.status(404).json({ error: `No API route for ${req.method} ${req.path}` }));
 
 // --- Static client (PWA) ----------------------------------------------------

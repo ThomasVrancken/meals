@@ -47,8 +47,9 @@ ${HOUSE_STYLE}
 ${JSON.stringify(EXAMPLE_RECIPE)}
 
 Before answering, silently check every recipe: ≤2 pans, no oven, no salt/pepper/oil/water listed,
-veg mostly from pre-cut bags, ≤2 easy things to cut, ≤30 min, AH-findable products, 3-6 short steps.
-Fix anything that fails.
+veg mostly from pre-cut bags, ≤2 easy things to cut, ≤30 min, AH-findable products, 3-6 short steps,
+"where" set only for non-obvious ingredients (not for pasta/rice/mince/milk/eggs/plain veg), tips are
+0-3 genuinely useful and not seasoning fluff. Fix anything that fails.
 `.trim();
 
 const normTitle = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();

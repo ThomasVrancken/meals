@@ -10,6 +10,10 @@
 // clear-suggestions and DELETE /api/chat, which affect existing dev data.
 // Start the server with REFLECTION_ENABLED=false so thumbs up/down don't
 // trigger LLM reflection runs.
+//
+// One exception to "non-LLM": creating a shopping item always classifies its
+// aisle with a tiny fast-model call server-side (no way to opt out via the
+// API), so this script does make two small classification calls.
 
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true });
@@ -29,7 +33,7 @@ if (process.env.COLLECTION_PREFIX && !process.env.COLLECTION_PREFIX.includes('de
 
 let passed = 0;
 let failed = 0;
-const created = { recipes: [], history: [] };
+const created = { recipes: [], history: [], shoppingItems: [] };
 
 async function api(method, url, body, { token = TOKEN } = {}) {
   const headers = {};
@@ -75,9 +79,9 @@ const recipeBody = (overrides = {}) => ({
   timeMinutes: 25,
   pans: 2,
   ingredients: [
-    { name: 'chicken thigh (kipdijfilet)', amount: '1 pack (300 g)', aisle: 'meat-fish' },
-    { name: 'Coconut milk', amount: '1 can (400 ml)', aisle: 'canned-jars', note: null },
-    { name: 'pandan rice', amount: '250 g', aisle: 'pasta-rice-noodles' },
+    { name: 'chicken thigh (kipdijfilet)', amount: '1 pack (300 g)', aisle: 'meat' },
+    { name: 'Coconut milk', amount: '1 can (400 ml)', aisle: 'world-food', note: null },
+    { name: 'pandan rice', amount: '250 g', aisle: 'carbs' },
   ],
   steps: ['Cook rice.', 'Fry chicken.', 'Add coconut milk and simmer.'],
   status: 'suggested',
@@ -155,9 +159,9 @@ async function run() {
     title: `${TAG} Week curry B`,
     inWeek: true,
     ingredients: [
-      { name: 'Chicken thigh (AH)', amount: '2 packs (600 g)', aisle: 'meat-fish' },
-      { name: 'coconut milk', amount: '1 can (400 ml)', aisle: 'canned-jars' },
-      { name: 'wok vegetable mix (AH wokgroente)', amount: '1 bag (400 g)', aisle: 'produce' },
+      { name: 'Chicken thigh (AH)', amount: '2 packs (600 g)', aisle: 'meat' },
+      { name: 'coconut milk', amount: '1 can (400 ml)', aisle: 'world-food' },
+      { name: 'wok vegetable mix (AH wokgroente)', amount: '1 bag (400 g)', aisle: 'vegetables' },
     ],
   });
   const B = r.data.recipe;
@@ -205,14 +209,30 @@ async function run() {
   check('GET /api/week contains A and B', r.status === 200 && weekIds.includes(A.id) && weekIds.includes(B.id), weekIds);
   const list = r.data.shoppingList || [];
   const aisles = list.map((g) => g.aisle);
-  const order = ['produce', 'meat-fish', 'dairy-eggs', 'pasta-rice-noodles', 'sauces-spices', 'canned-jars', 'frozen', 'bakery', 'other'];
+  const order = [
+    'spices',
+    'fruit',
+    'vegetables',
+    'fresh-meals',
+    'meat',
+    'cheese-deli',
+    'bread',
+    'carbs',
+    'world-food',
+    'cereals',
+    'snacks',
+    'tea',
+    'dairy',
+    'drinks',
+    'misc',
+  ];
   check(
-    'shopping list grouped in walking order',
+    'shopping list grouped in AH Haarlemmerplein walking order',
     aisles.every((a, i) => i === 0 || order.indexOf(aisles[i - 1]) < order.indexOf(a)),
     aisles
   );
   const findItem = (aisle, pred) => ((list.find((g) => g.aisle === aisle) || {}).items || []).filter(pred);
-  const chicken = findItem('meat-fish', (i) => i.name.toLowerCase().startsWith('chicken thigh'));
+  const chicken = findItem('meat', (i) => i.name.toLowerCase().startsWith('chicken thigh'));
   check(
     'chicken thigh merged across parenthesised variants',
     chicken.length === 1 &&
@@ -222,7 +242,7 @@ async function run() {
       chicken[0].recipes.includes(`${TAG} Week curry B`),
     chicken
   );
-  const coconut = findItem('canned-jars', (i) => i.name.toLowerCase() === 'coconut milk');
+  const coconut = findItem('world-food', (i) => i.name.toLowerCase() === 'coconut milk');
   check(
     'coconut milk merged case-insensitively with both amounts kept',
     coconut.length === 1 && coconut[0].amounts.length >= 2,
@@ -328,8 +348,62 @@ async function run() {
   check('ai-edit without instruction -> 400', r.status === 400, r.data);
   r = await api('POST', '/api/recipes/doesnotexist123/ai-edit', { instruction: 'spicier' });
   check('ai-edit unknown recipe -> 404', r.status === 404, r.data);
+  r = await api('POST', `/api/recipes/${A.id}/ask`, { question: '' });
+  check('ask without question -> 400', r.status === 400, r.data);
+  r = await api('POST', `/api/recipes/${A.id}/ask`, { question: 'ok?', history: 'not-an-array' });
+  check('ask with non-array history -> 400', r.status === 400, r.data);
+  r = await api('POST', '/api/recipes/doesnotexist123/ask', { question: 'can I use tofu?' });
+  check('ask unknown recipe -> 404', r.status === 404, r.data);
   r = await api('POST', '/api/chat', { message: '   ' });
   check('chat with empty message -> 400', r.status === 400, r.data);
+
+  // --- shopping items (manual "Other groceries" list)
+  console.log('\nShopping items');
+  r = await api('POST', '/api/shopping-items', {});
+  check('POST shopping-items without name -> 400', r.status === 400, r.data);
+  r = await api('POST', '/api/shopping-items', { name: `${TAG} milk` });
+  const item1 = r.data && r.data.item;
+  if (item1) created.shoppingItems.push(item1.id);
+  check(
+    'POST shopping-items -> item unchecked with a classified aisle',
+    r.status === 201 && item1 && item1.checked === false && item1.name.includes('milk') && typeof item1.aisle === 'string',
+    r.data
+  );
+  r = await api('POST', '/api/shopping-items', { name: `${TAG} eggs`, amount: 'x6' });
+  const item2 = r.data && r.data.item;
+  if (item2) created.shoppingItems.push(item2.id);
+  check('POST shopping-items keeps amount', r.status === 201 && item2 && item2.amount === 'x6', r.data);
+  r = await api('GET', '/api/shopping-items');
+  check(
+    'GET shopping-items lists both, oldest first',
+    r.status === 200 &&
+      Array.isArray(r.data.items) &&
+      r.data.items.some((i) => i.id === item1.id) &&
+      r.data.items.findIndex((i) => i.id === item1.id) < r.data.items.findIndex((i) => i.id === item2.id),
+    r.data
+  );
+  r = await api('PATCH', `/api/shopping-items/${item1.id}`, { checked: true, amount: 'x2' });
+  check(
+    'PATCH shopping-items updates checked & amount',
+    r.status === 200 && r.data.item.checked === true && r.data.item.amount === 'x2',
+    r.data
+  );
+  r = await api('PATCH', `/api/shopping-items/${item1.id}`, { aisle: 'not-a-real-aisle' });
+  check('PATCH shopping-items bad aisle -> 400', r.status === 400, r.data);
+  r = await api('PATCH', `/api/shopping-items/${item1.id}`, { aisle: 'dairy' });
+  check('PATCH shopping-items valid aisle', r.status === 200 && r.data.item.aisle === 'dairy', r.data);
+  r = await api('PATCH', '/api/shopping-items/doesnotexist123', { checked: true });
+  check('PATCH unknown shopping-item -> 404', r.status === 404, r.data);
+  r = await api('POST', '/api/shopping-items/clear-checked');
+  check('POST clear-checked removes the checked item', r.status === 200 && r.data.deleted >= 1, r.data);
+  created.shoppingItems = created.shoppingItems.filter((id) => id !== item1.id);
+  r = await api('GET', '/api/shopping-items');
+  check('cleared item no longer listed', r.status === 200 && !r.data.items.some((i) => i.id === item1.id), r.data);
+  r = await api('DELETE', `/api/shopping-items/${item2.id}`);
+  check('DELETE shopping-items -> {ok}', r.status === 200 && r.data.ok === true, r.data);
+  created.shoppingItems = created.shoppingItems.filter((id) => id !== item2.id);
+  r = await api('DELETE', `/api/shopping-items/${item2.id}`);
+  check('DELETE shopping-items again -> 404', r.status === 404, r.data);
 
   // --- chat (no LLM)
   console.log('\nChat');
@@ -344,8 +418,11 @@ async function run() {
 async function cleanup() {
   for (const id of created.history) await api('DELETE', `/api/history/${id}`).catch(() => {});
   for (const id of created.recipes) await api('DELETE', `/api/recipes/${id}`).catch(() => {});
+  for (const id of created.shoppingItems) await api('DELETE', `/api/shopping-items/${id}`).catch(() => {});
   const r = await api('GET', `/api/recipes/${created.recipes[0]}`).catch(() => ({}));
-  console.log(`\nCleanup: removed ${created.recipes.length} recipes, ${created.history.length} history entries${r.status === 404 ? '' : ' (recipe delete check failed!)'}`);
+  console.log(
+    `\nCleanup: removed ${created.recipes.length} recipes, ${created.history.length} history entries, ${created.shoppingItems.length} shopping items${r.status === 404 ? '' : ' (recipe delete check failed!)'}`
+  );
 }
 
 run()

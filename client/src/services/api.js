@@ -85,6 +85,10 @@ class ApiService {
     return this.client.post(`/recipes/${id}/ai-edit`, { instruction, asVariation }, { timeout: LONG_TIMEOUT })
   }
 
+  askRecipe(id, { question, history } = {}) {
+    return this.client.post(`/recipes/${id}/ask`, { question, history }, { timeout: LONG_TIMEOUT })
+  }
+
   cookRecipe(id, { rating, note, cookedAt } = {}) {
     return this.client.post(`/recipes/${id}/cooked`, { rating, note, cookedAt })
   }
@@ -139,6 +143,27 @@ class ApiService {
 
   clearChat() {
     return this.client.delete('/chat')
+  }
+
+  // Shopping items (manual groceries)
+  getShoppingItems() {
+    return this.client.get('/shopping-items')
+  }
+
+  addShoppingItem({ name, amount } = {}) {
+    return this.client.post('/shopping-items', { name, amount })
+  }
+
+  updateShoppingItem(id, patch) {
+    return this.client.patch(`/shopping-items/${id}`, patch)
+  }
+
+  deleteShoppingItem(id) {
+    return this.client.delete(`/shopping-items/${id}`)
+  }
+
+  clearCheckedShoppingItems() {
+    return this.client.post('/shopping-items/clear-checked')
   }
 }
 
