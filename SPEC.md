@@ -21,7 +21,7 @@ Reference implementation for infra patterns: `~/Documents/projects/newsfeed/thou
   **No queries that need composite indexes**: data volume is tiny, so fetch and filter/sort in memory
   where needed (single-field `orderBy` is fine).
 - LLM: OpenAI via the official `openai` npm package, **Responses API**. Models from env:
-  `OPENAI_MODEL` (default `gpt-5.5`, for recipe generation, recipe edits, and the chat agent) and
+  `OPENAI_MODEL` (default `gpt-5.6-sol`, for recipe generation, recipe edits, and the chat agent) and
   `OPENAI_MODEL_FAST` (default `gpt-5.4-mini`, for cheap background work like reflection).
   Use `reasoning: { effort: 'low' }` unless quality demands more. Use structured outputs
   (`text.format` json_schema, strict) for recipe JSON.
