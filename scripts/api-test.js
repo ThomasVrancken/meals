@@ -348,12 +348,12 @@ async function run() {
   check('ai-edit without instruction -> 400', r.status === 400, r.data);
   r = await api('POST', '/api/recipes/doesnotexist123/ai-edit', { instruction: 'spicier' });
   check('ai-edit unknown recipe -> 404', r.status === 404, r.data);
-  r = await api('POST', `/api/recipes/${A.id}/ask`, { question: '' });
-  check('ask without question -> 400', r.status === 400, r.data);
-  r = await api('POST', `/api/recipes/${A.id}/ask`, { question: 'ok?', history: 'not-an-array' });
-  check('ask with non-array history -> 400', r.status === 400, r.data);
-  r = await api('POST', '/api/recipes/doesnotexist123/ask', { question: 'can I use tofu?' });
-  check('ask unknown recipe -> 404', r.status === 404, r.data);
+  r = await api('POST', `/api/recipes/${A.id}/chat`, { message: '' });
+  check('recipe chat without message -> 400', r.status === 400, r.data);
+  r = await api('POST', `/api/recipes/${A.id}/chat`, { message: 'ok?', history: 'not-an-array' });
+  check('recipe chat with non-array history -> 400', r.status === 400, r.data);
+  r = await api('POST', '/api/recipes/doesnotexist123/chat', { message: 'can I use tofu?' });
+  check('recipe chat unknown recipe -> 404', r.status === 404, r.data);
   r = await api('POST', '/api/chat', { message: '   ' });
   check('chat with empty message -> 400', r.status === 400, r.data);
 

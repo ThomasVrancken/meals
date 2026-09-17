@@ -32,7 +32,8 @@ Code sessions.
     hints, recipe `tips`). This is the file to edit when recipes feel off-brand — it's shared by
     generation, edits and the chat agent.
   - `server/services/*.js` — `generate.js` (batch suggestions), `recipeEdit.js` (AI-edit one
-    recipe), `recipeAsk.js` (answer a question about one recipe, never mutates it), `classifyAisle.js`
+    recipe), `recipeChat.js` (per-recipe chat: answers questions and decides itself whether to call
+    its one `edit_recipe` tool, which delegates to `recipeEdit.js`), `classifyAisle.js`
     (tiny fast-model call to classify one manual grocery item's aisle, always falls back to `misc`),
     `chatAgent.js` (tool-using agent loop, max 8 rounds, incl. `add_shopping_items`), `reflect.js`
     (background "learned" notes rewrite, fires after 3 feedback events), `shoppingList.js`

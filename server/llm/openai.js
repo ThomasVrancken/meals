@@ -26,7 +26,7 @@ function getClient() {
 }
 
 const models = {
-  main: () => process.env.OPENAI_MODEL || 'gpt-5.4',
+  main: () => process.env.OPENAI_MODEL || 'gpt-5.5',
   fast: () => process.env.OPENAI_MODEL_FAST || 'gpt-5.4-mini',
 };
 

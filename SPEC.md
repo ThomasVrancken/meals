@@ -21,7 +21,7 @@ Reference implementation for infra patterns: `~/Documents/projects/newsfeed/thou
   **No queries that need composite indexes**: data volume is tiny, so fetch and filter/sort in memory
   where needed (single-field `orderBy` is fine).
 - LLM: OpenAI via the official `openai` npm package, **Responses API**. Models from env:
-  `OPENAI_MODEL` (default `gpt-5.4`, for recipe generation, recipe edits, and the chat agent) and
+  `OPENAI_MODEL` (default `gpt-5.5`, for recipe generation, recipe edits, and the chat agent) and
   `OPENAI_MODEL_FAST` (default `gpt-5.4-mini`, for cheap background work like reflection).
   Use `reasoning: { effort: 'low' }` unless quality demands more. Use structured outputs
   (`text.format` json_schema, strict) for recipe JSON.
@@ -163,7 +163,7 @@ error) since there's no recipe context to infer it from; PATCH lets the user cha
 | POST `/api/recipes/generate` | `{count?=5 (1–8), hint?}` | `{recipes}` (newly created, status suggested) |
 | PATCH `/api/recipes/:id` | any of title, emoji, description, ingredients, steps, timeMinutes, tags, inWeek, status, feedback, feedbackNote | `{recipe}` (feedback changes follow status semantics above + count as feedback event) |
 | POST `/api/recipes/:id/ai-edit` | `{instruction, asVariation?:false}` | `{recipe, summary}` (in place, or new saved recipe with parentId) |
-| POST `/api/recipes/:id/ask` | `{question, history?: [{role:'user'\|'assistant', text}]}` | `{answer}` — answers about the recipe, never mutates it; client resends prior Q&A turns as `history` for follow-ups |
+| POST `/api/recipes/:id/chat` | `{message, history?: [{role:'user'\|'assistant', text}]}` | `{answer, edit: null \| {recipeId, title, summary, created}}` — answers about the recipe and may edit it itself; client resends prior turns as `history` for follow-ups |
 | POST `/api/recipes/:id/cooked` | `{rating?, note?, cookedAt?}` | `{recipe, entry}` |
 | POST `/api/recipes/clear-suggestions` | | `{dismissed: n}`: dismiss suggestions with no feedback and not inWeek (no feedback event) |
 | GET `/api/week` | | `{recipes, shoppingList: [{aisle, items:[{name, amounts:[string], recipes:[title]}]}]}` |
@@ -238,12 +238,15 @@ Tools (all operate on the same services the routes use):
 Each successful mutating tool call adds an `actions` chip (e.g. `{type:'preferences', label:'Updated dislikes: less zucchini'}`)
 and flips the matching `changed` flag in the response.
 
-### Ask about a recipe (`services/recipeAsk.js`)
-Separate from editing: `POST /api/recipes/:id/ask` answers a question about one recipe (the recipe
-JSON + shared context + prior turns from `history`) without ever mutating it. Short, practical,
-conversational answers; `OPENAI_MODEL` with `reasoning: { effort: 'low' }` (no structured-output
-schema needed, just a text answer). The client keeps the Q&A thread in component state for the open
-recipe sheet only and resends it as `history` on each follow-up.
+### Recipe chat (`services/recipeChat.js`)
+`POST /api/recipes/:id/chat` is one chat box per recipe that both answers questions and changes the
+recipe when that's what the user wants. The model (`OPENAI_MODEL`, `reasoning: { effort: 'medium' }`)
+gets the recipe JSON + shared context + prior turns from `history`, and has a single `edit_recipe`
+tool (`{instruction, asVariation}`) that delegates to `recipeEdit.js`. It decides on its own: edits
+for explicit changes or "this is what I actually did", answers (and offers to update) for pure
+questions. At most one edit per message; `edit` in the response describes it (or is null). If the
+follow-up reply fails after an edit landed, the edit is still returned. The client keeps the thread
+in component state for the open recipe sheet only and resends it as `history`.
 
 ### Learning (`services/reflect.js`)
 Feedback events = thumbs up/down (with or without note), cooked with rating, chat-logged meals.
@@ -284,13 +287,9 @@ App name **Two Pans**, emoji icon 🍳 (generate PNG icons 32/180/192/512). Warm
 (amount + name + note, with a small muted "where to find it" line when set), numbered Steps, a Tips
 section after Steps (only shown when non-empty). Actions: +Week toggle, 👍/👎, Cooked it (sheet:
 rating up/meh/down, note, date), Edit (form: title, emoji, ingredients one per line as
-`amount | name | aisle | where`, steps one per line, tips one per line), and an "Ask AI" box with a
-small segmented toggle:
-- **Ask** (default): a question input + small Q&A thread (component state, this sheet only; prior
-  turns resent as `history` so follow-ups work); never changes the recipe. A tiny "Apply this as a
-  change" link under each answer switches to Change mode with the instruction pre-filled.
-- **Change**: the original ai-edit flow (instruction input, "save as variation" checkbox, "Apply
-  change" button).
+`amount | name | aisle | where`, steps one per line, tips one per line), and an "Ask AI" chat box (thread in component state, this sheet only). Questions get answers; changes
+("make it spicier", "I used coconut cream, keep it") are applied by the AI itself, shown as a small
+"✓ Recipe updated" line under its reply. If it saved a new variation, the sheet switches to it.
 
 Auth: access-code gate screen (stores token in localStorage). Visiting `/?code=<APP_TOKEN>` logs in
 automatically and strips the param (so Thomas can send Lote one link). Client HTTP timeout ≥ 120 s.

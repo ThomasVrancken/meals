@@ -3,7 +3,7 @@ const store = require('../db');
 const recipes = require('../services/recipes');
 const { generateSuggestions } = require('../services/generate');
 const { editRecipe } = require('../services/recipeEdit');
-const { askAboutRecipe } = require('../services/recipeAsk');
+const { chatAboutRecipe } = require('../services/recipeChat');
 const { badRequest, notFound } = require('../http');
 
 const router = express.Router();
@@ -74,10 +74,11 @@ router.post('/:id/ai-edit', async (req, res) => {
   res.json({ recipe, summary });
 });
 
-router.post('/:id/ask', async (req, res) => {
+// Per-recipe chat: answers questions and may edit the recipe itself (see services/recipeChat.js).
+router.post('/:id/chat', async (req, res) => {
   const body = req.body || {};
-  if (typeof body.question !== 'string' || !body.question.trim()) throw badRequest('question is required');
-  if (body.question.length > 1000) throw badRequest('question is too long (max 1000 chars)');
+  if (typeof body.message !== 'string' || !body.message.trim()) throw badRequest('message is required');
+  if (body.message.length > 2000) throw badRequest('message is too long (max 2000 chars)');
   let history = [];
   if (body.history !== undefined && body.history !== null) {
     if (!Array.isArray(body.history) || body.history.length > 20) throw badRequest('history must be an array (max 20)');
@@ -88,8 +89,8 @@ router.post('/:id/ask', async (req, res) => {
       return { role: h.role, text: h.text.slice(0, 2000) };
     });
   }
-  const { answer } = await askAboutRecipe(req.params.id, { question: body.question.trim(), history });
-  res.json({ answer });
+  const { answer, edit } = await chatAboutRecipe(req.params.id, { message: body.message.trim(), history });
+  res.json({ answer, edit });
 });
 
 router.post('/:id/cooked', async (req, res) => {

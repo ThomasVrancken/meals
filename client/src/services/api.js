@@ -85,8 +85,8 @@ class ApiService {
     return this.client.post(`/recipes/${id}/ai-edit`, { instruction, asVariation }, { timeout: LONG_TIMEOUT })
   }
 
-  askRecipe(id, { question, history } = {}) {
-    return this.client.post(`/recipes/${id}/ask`, { question, history }, { timeout: LONG_TIMEOUT })
+  chatRecipe(id, { message, history } = {}) {
+    return this.client.post(`/recipes/${id}/chat`, { message, history }, { timeout: LONG_TIMEOUT })
   }
 
   cookRecipe(id, { rating, note, cookedAt } = {}) {

@@ -17,7 +17,7 @@ OPENAI_API_KEY=...
 APP_TOKEN=...                 # access code for the app
 GOOGLE_CLOUD_PROJECT=mlsd-2026-483513
 COLLECTION_PREFIX=mealsdev_   # always a dev prefix locally; the Firestore DB is shared
-OPENAI_MODEL=gpt-5.4
+OPENAI_MODEL=gpt-5.5
 OPENAI_MODEL_FAST=gpt-5.4-mini
 PORT=3002
 ```

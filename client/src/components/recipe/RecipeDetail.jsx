@@ -18,25 +18,23 @@ export function RecipeDetail({ recipeId, onClose }) {
   const [savingEdit, setSavingEdit] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const [aiMode, setAiMode] = useState('ask') // ask | change
-  const [aiInstruction, setAiInstruction] = useState('')
-  const [asVariation, setAsVariation] = useState(false)
-  const [aiBusy, setAiBusy] = useState(false)
-  const [aiSummary, setAiSummary] = useState(null)
-  const [aiError, setAiError] = useState(null)
+  // The sheet follows a new variation if the AI creates one, so this can differ from the prop.
+  const [activeId, setActiveId] = useState(recipeId)
+  const [chatThread, setChatThread] = useState([]) // [{role, text, edit?}], this sheet only
+  const [chatInput, setChatInput] = useState('')
+  const [chatBusy, setChatBusy] = useState(false)
+  const [chatError, setChatError] = useState(null)
 
-  const [askThread, setAskThread] = useState([]) // [{role:'user'|'assistant', text}], this sheet only
-  const [askInput, setAskInput] = useState('')
-  const [askBusy, setAskBusy] = useState(false)
-  const [askError, setAskError] = useState(null)
-
-  const recipe = useMemo(() => recipes.find((r) => r.id === recipeId) || fetched, [recipes, fetched, recipeId])
+  const recipe = useMemo(
+    () => recipes.find((r) => r.id === activeId) || (fetched?.id === activeId ? fetched : null),
+    [recipes, fetched, activeId]
+  )
 
   useEffect(() => {
-    if (!recipes.find((r) => r.id === recipeId)) {
-      api.getRecipe(recipeId).then(({ recipe }) => setFetched(recipe)).catch(() => {})
+    if (!recipes.find((r) => r.id === activeId)) {
+      api.getRecipe(activeId).then(({ recipe }) => setFetched(recipe)).catch(() => {})
     }
-  }, [recipeId, recipes])
+  }, [activeId, recipes])
 
   if (!recipe) {
     return (
@@ -94,52 +92,26 @@ export function RecipeDetail({ recipeId, onClose }) {
     }
   }
 
-  const submitAiEdit = async () => {
-    if (!aiInstruction.trim() || aiBusy) return
-    setAiBusy(true)
-    setAiError(null)
-    setAiSummary(null)
+  const submitChat = async () => {
+    const message = chatInput.trim()
+    if (!message || chatBusy) return
+    setChatInput('')
+    setChatBusy(true)
+    setChatError(null)
+    const history = chatThread.map(({ role, text }) => ({ role, text }))
+    setChatThread((prev) => [...prev, { role: 'user', text: message }])
     try {
-      const { recipe: updated, summary } = await api.aiEditRecipe(recipe.id, {
-        instruction: aiInstruction.trim(),
-        asVariation,
-      })
-      setAiSummary(summary)
-      setAiInstruction('')
-      await refreshRecipes()
-      if (asVariation && updated?.id && updated.id !== recipe.id) {
-        setFetched(updated)
+      const { answer, edit } = await api.chatRecipe(recipe.id, { message, history })
+      setChatThread((prev) => [...prev, { role: 'assistant', text: answer, edit }])
+      if (edit) {
+        await Promise.all([refreshRecipes(), recipe.inWeek ? refreshWeek() : null])
+        if (edit.created) setActiveId(edit.recipeId)
       }
     } catch (err) {
-      setAiError(err.message || 'Could not make that change. Try again.')
+      setChatError(err.message || 'Could not get an answer. Try again.')
     } finally {
-      setAiBusy(false)
+      setChatBusy(false)
     }
-  }
-
-  const submitAsk = async () => {
-    const question = askInput.trim()
-    if (!question || askBusy) return
-    setAskInput('')
-    setAskBusy(true)
-    setAskError(null)
-    const priorHistory = askThread
-    setAskThread((prev) => [...prev, { role: 'user', text: question }])
-    try {
-      const { answer } = await api.askRecipe(recipe.id, { question, history: priorHistory })
-      setAskThread((prev) => [...prev, { role: 'assistant', text: answer }])
-    } catch (err) {
-      setAskError(err.message || 'Could not get an answer. Try again.')
-    } finally {
-      setAskBusy(false)
-    }
-  }
-
-  const applyAsChange = (text) => {
-    setAiMode('change')
-    setAiInstruction(text)
-    setAiError(null)
-    setAiSummary(null)
   }
 
   return (
@@ -266,120 +238,62 @@ export function RecipeDetail({ recipeId, onClose }) {
               <Sparkles size={16} className="text-tomato-500" /> Ask AI
             </h2>
 
-            <div className="flex bg-ink-50 rounded-xl p-1 mb-3">
-              <button
-                type="button"
-                onClick={() => setAiMode('ask')}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  aiMode === 'ask' ? 'bg-white shadow-card text-ink-800' : 'text-ink-400'
-                }`}
-              >
-                Ask
-              </button>
-              <button
-                type="button"
-                onClick={() => setAiMode('change')}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  aiMode === 'change' ? 'bg-white shadow-card text-ink-800' : 'text-ink-400'
-                }`}
-              >
-                Change
-              </button>
-            </div>
-
-            {aiMode === 'ask' ? (
-              <div>
-                {askThread.length > 0 && (
-                  <div className="space-y-2 mb-3">
-                    {askThread.map((m, i) => (
-                      <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className="max-w-[90%]">
-                          <div
-                            className={`rounded-2xl px-3.5 py-2 text-sm leading-snug whitespace-pre-wrap ${
-                              m.role === 'user'
-                                ? 'bg-tomato-500 text-white rounded-br-md'
-                                : 'bg-white text-ink-800 shadow-card rounded-bl-md'
-                            }`}
-                          >
-                            {m.text}
-                          </div>
-                          {m.role === 'assistant' && (
-                            <button
-                              onClick={() => applyAsChange(askThread[i - 1]?.text || m.text)}
-                              className="mt-1 text-xs font-medium text-tomato-600 underline underline-offset-2"
-                            >
-                              Apply this as a change
-                            </button>
-                          )}
-                        </div>
+            {chatThread.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {chatThread.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className="max-w-[90%]">
+                      <div
+                        className={`rounded-2xl px-3.5 py-2 text-sm leading-snug whitespace-pre-wrap ${
+                          m.role === 'user'
+                            ? 'bg-tomato-500 text-white rounded-br-md'
+                            : 'bg-white text-ink-800 shadow-card rounded-bl-md'
+                        }`}
+                      >
+                        {m.text}
                       </div>
-                    ))}
-                  </div>
-                )}
-                {askBusy && (
-                  <div className="flex justify-start mb-3">
-                    <div className="bg-white shadow-card rounded-2xl rounded-bl-md px-4 py-3 text-ink-400">
-                      <LoadingDots />
+                      {m.edit && (
+                        <p className="mt-1 text-xs font-medium text-basil-600">
+                          ✓ {m.edit.created ? `Saved as new recipe: ${m.edit.title}` : 'Recipe updated'}
+                        </p>
+                      )}
                     </div>
                   </div>
-                )}
-                {askError && <p className="text-tomato-600 text-xs mb-2">{askError}</p>}
-                <div className="flex items-end gap-2">
-                  <textarea
-                    value={askInput}
-                    onChange={(e) => setAskInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        submitAsk()
-                      }
-                    }}
-                    placeholder="e.g. can I use chicken breast instead?"
-                    rows={1}
-                    disabled={askBusy}
-                    className="flex-1 bg-white border border-ink-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tomato-400 resize-none max-h-28 disabled:opacity-60"
-                  />
-                  <button
-                    onClick={submitAsk}
-                    disabled={!askInput.trim() || askBusy}
-                    aria-label="Send"
-                    className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-tomato-500 text-white active:bg-tomato-600 disabled:opacity-40"
-                  >
-                    <ArrowUp size={18} />
-                  </button>
+                ))}
+              </div>
+            )}
+            {chatBusy && (
+              <div className="flex justify-start mb-3">
+                <div className="bg-white shadow-card rounded-2xl rounded-bl-md px-4 py-3 text-ink-400">
+                  <LoadingDots />
                 </div>
               </div>
-            ) : aiBusy ? (
-              <LoadingPanel message="Rewriting the recipe…" sub="Usually takes 10–30 seconds." />
-            ) : (
-              <>
-                <textarea
-                  value={aiInstruction}
-                  onChange={(e) => setAiInstruction(e.target.value)}
-                  placeholder="e.g. swap chicken for tofu, make it spicier"
-                  rows={2}
-                  className="w-full bg-white border border-ink-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tomato-400 resize-none mb-2"
-                />
-                <label className="flex items-center gap-2 mb-3 text-sm text-ink-600">
-                  <input
-                    type="checkbox"
-                    checked={asVariation}
-                    onChange={(e) => setAsVariation(e.target.checked)}
-                    className="w-4 h-4 rounded accent-tomato-500"
-                  />
-                  Save as a new variation instead of changing this one
-                </label>
-                {aiError && <p className="text-tomato-600 text-xs mb-2">{aiError}</p>}
-                {aiSummary && <p className="text-basil-600 text-xs mb-2">✓ {aiSummary}</p>}
-                <button
-                  onClick={submitAiEdit}
-                  disabled={!aiInstruction.trim() || aiBusy}
-                  className="w-full py-3 rounded-2xl font-semibold text-white bg-tomato-500 active:bg-tomato-600 disabled:opacity-40"
-                >
-                  Apply change
-                </button>
-              </>
             )}
+            {chatError && <p className="text-tomato-600 text-xs mb-2">{chatError}</p>}
+            <div className="flex items-end gap-2">
+              <textarea
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    submitChat()
+                  }
+                }}
+                placeholder="Ask a question, or tell me what to change"
+                rows={1}
+                disabled={chatBusy}
+                className="flex-1 bg-white border border-ink-100 rounded-2xl px-4 py-3 text-sm outline-none focus:border-tomato-400 resize-none max-h-28 disabled:opacity-60"
+              />
+              <button
+                onClick={submitChat}
+                disabled={!chatInput.trim() || chatBusy}
+                aria-label="Send"
+                className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-tomato-500 text-white active:bg-tomato-600 disabled:opacity-40"
+              >
+                <ArrowUp size={18} />
+              </button>
+            </div>
           </div>
         </div>
       )}
