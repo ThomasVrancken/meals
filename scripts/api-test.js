@@ -272,10 +272,24 @@ async function run() {
   const aAfter = (await api('GET', `/api/recipes/${A.id}`)).data.recipe;
   const dAfter = (await api('GET', `/api/recipes/${D.id}`)).data.recipe;
   check(
-    'clear-suggestions dismisses untouched D, keeps inWeek A',
-    r.status === 200 && r.data.dismissed >= 1 && dAfter.status === 'dismissed' && aAfter.status === 'suggested',
-    { res: r.data, a: aAfter.status, d: dAfter.status }
+    'clear-suggestions sets aside untouched D, keeps inWeek A',
+    r.status === 200 && r.data.dismissed >= 1 && dAfter.status === 'dismissed' && dAfter.setAside === true && !dAfter.feedback &&
+      aAfter.status === 'suggested',
+    { res: r.data, a: aAfter.status, d: dAfter }
   );
+
+  r = await createRecipe({ title: `${TAG} Set aside E` });
+  const E = r.data.recipe;
+  r = await api('POST', `/api/recipes/${E.id}/set-aside`);
+  check(
+    'set-aside removes a suggestion without feedback',
+    r.status === 200 && r.data.recipe.status === 'dismissed' && r.data.recipe.setAside === true && !r.data.recipe.feedback,
+    r.data
+  );
+  r = await api('POST', `/api/recipes/${E.id}/set-aside`);
+  check('set-aside on a non-suggestion -> 400', r.status === 400, r.data);
+  r = await api('PATCH', `/api/recipes/${E.id}`, { feedback: 'down' });
+  check('later thumbs-down clears setAside', r.status === 200 && r.data.recipe.setAside === false, r.data);
 
   // --- cooked flow
   console.log('\nCooked & history');

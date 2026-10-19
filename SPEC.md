@@ -98,6 +98,7 @@ Seed values (written once if the doc does not exist; also used as fallback):
   status: 'suggested'|'saved'|'dismissed',
   inWeek: boolean,                 // picked for this week's shopping
   feedback: 'up'|'down'|null, feedbackNote: string|null,
+  setAside: boolean,               // removed from Ideas with "not now" (neutral, not a dislike)
   source: 'ai'|'chat'|'manual', parentId: string|null,
   cookedCount: number, lastCookedAt: ISO|null,
   hint: string|null, createdAt, updatedAt }
@@ -135,7 +136,8 @@ A pre-2026-09 dataset used a 9-key taxonomy (`produce`, `meat-fish`, `dairy-eggs
 any unmigrated data still groups sensibly instead of crashing or vanishing.
 
 Status semantics: `suggested` = shown in Ideas; `saved` = in the cookbook (favourites / cooked
-before); `dismissed` = hidden (kept as a negative signal). Thumbs-down on a suggestion sets
+before); `dismissed` = hidden (kept as a negative signal, unless `setAside`: removed with "not now", which
+the AI sees as neutral and may suggest again). Thumbs-down on a suggestion sets
 `feedback:'down'` AND `status:'dismissed'`. Thumbs-up sets `feedback:'up'` and `status:'saved'`.
 Cooking a recipe sets `status:'saved'`, `inWeek:false`, increments `cookedCount`.
 
@@ -165,7 +167,8 @@ error) since there's no recipe context to infer it from; PATCH lets the user cha
 | POST `/api/recipes/:id/ai-edit` | `{instruction, asVariation?:false}` | `{recipe, summary}` (in place, or new saved recipe with parentId) |
 | POST `/api/recipes/:id/chat` | `{message, history?: [{role:'user'\|'assistant', text}]}` | `{answer, edit: null \| {recipeId, title, summary, created}}` — answers about the recipe and may edit it itself; client resends prior turns as `history` for follow-ups |
 | POST `/api/recipes/:id/cooked` | `{rating?, note?, cookedAt?}` | `{recipe, entry}` |
-| POST `/api/recipes/clear-suggestions` | | `{dismissed: n}`: dismiss suggestions with no feedback and not inWeek (no feedback event) |
+| POST `/api/recipes/clear-suggestions` | | `{dismissed: n}`: set aside ("not now") suggestions with no feedback and not inWeek (no feedback event) |
+| POST `/api/recipes/:id/set-aside` | | `{recipe}`: remove one suggestion from Ideas without rating it (status dismissed, setAside true, out of the week; no feedback event; 400 if not a suggestion) |
 | GET `/api/week` | | `{recipes, shoppingList: [{aisle, items:[{name, amounts:[string], recipes:[title]}]}]}` |
 | GET `/api/history` | | `{entries}` newest cookedAt first |
 | POST `/api/history` | `{title, recipeId?, rating?, note?, cookedAt?}` | `{entry}` |
@@ -266,7 +269,8 @@ App name **Two Pans**, emoji icon 🍳 (generate PNG icons 32/180/192/512). Warm
    Generation shows a friendly loading state (it takes ~20–40 s). Recipe cards: emoji, title,
    1-line description, chips (⏱ 25 min, 🍳 2 pans, cuisine). Quick actions on the card:
    👎 (dismiss, optional reason prompt via small sheet with skip), 👍, "+ Week" toggle, "Cooked ✓".
-   Small "Clear untouched" link. Cookbook shows saved recipes with cookedCount / last cooked.
+   Each suggestion card has an ✕ ("not now") that removes it without a rating; a "Remove all"
+link above the list (tap twice to confirm) does the same for every suggestion not picked for the week. Cookbook shows saved recipes with cookedCount / last cooked.
 2. **Week**: recipes picked for this week (remove / cooked buttons) + one combined, store-ordered
    shopping list (recipe ingredients merged with manual items, see below), grouped by aisle in AH
    Haarlemmerplein walking order. "Other groceries": a quick-add input (type + Enter/Add; `milk x2`

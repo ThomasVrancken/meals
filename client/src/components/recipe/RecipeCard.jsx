@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ThumbsUp, ThumbsDown, Plus, Check, CookingPot, Clock } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Plus, Check, CookingPot, Clock, X } from 'lucide-react'
 import { Chip } from '../common/Chip'
 import { DismissSheet } from './DismissSheet'
 import { CookedSheet } from './CookedSheet'
@@ -42,6 +42,22 @@ export function RecipeCard({ recipe, onOpen, variant = 'suggested' }) {
     }
   }
 
+  // "Not now": off the Ideas list without a rating, so it doesn't teach the AI anything negative.
+  const setAside = async (e) => {
+    e.stopPropagation()
+    if (busy) return
+    setBusy(true)
+    patchRecipeLocal(recipe.id, { status: 'dismissed', setAside: true, inWeek: false })
+    try {
+      await api.setAsideRecipe(recipe.id)
+      if (recipe.inWeek) refreshWeek()
+    } catch {
+      patchRecipeLocal(recipe.id, { status: recipe.status, setAside: recipe.setAside, inWeek: recipe.inWeek })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const confirmDismiss = async (reason) => {
     patchRecipeLocal(recipe.id, { feedback: 'down', status: 'dismissed' })
     await api.updateRecipe(recipe.id, { feedback: 'down', feedbackNote: reason || null })
@@ -57,12 +73,24 @@ export function RecipeCard({ recipe, onOpen, variant = 'suggested' }) {
     <>
       <div
         onClick={() => onOpen(recipe.id)}
-        className="bg-white rounded-2xl shadow-card p-4 active:scale-[0.98] transition-transform cursor-pointer"
+        className="relative bg-white rounded-2xl shadow-card p-4 active:scale-[0.98] transition-transform cursor-pointer"
       >
+        {variant === 'suggested' && (
+          <button
+            onClick={setAside}
+            aria-label="Remove (not now)"
+            title="Not now"
+            className="absolute top-2 right-2 w-10 h-10 flex items-center justify-center rounded-full text-ink-400 active:bg-ink-50"
+          >
+            <X size={18} />
+          </button>
+        )}
         <div className="flex items-start gap-3">
           <div className="text-3xl leading-none shrink-0 mt-0.5">{recipe.emoji || '🍽️'}</div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-ink-800 leading-snug">{recipe.title}</h3>
+            <h3 className={`font-semibold text-ink-800 leading-snug ${variant === 'suggested' ? 'pr-8' : ''}`}>
+              {recipe.title}
+            </h3>
             {recipe.description && (
               <p className="text-sm text-ink-500 mt-0.5 line-clamp-2">{recipe.description}</p>
             )}

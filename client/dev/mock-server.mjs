@@ -457,7 +457,7 @@ const server = createServer(async (req, res) => {
       recipes = recipes.map((r) => {
         if (r.status === 'suggested' && !r.feedback && !r.inWeek) {
           dismissed++
-          return { ...r, status: 'dismissed', updatedAt: now() }
+          return { ...r, status: 'dismissed', setAside: true, updatedAt: now() }
         }
         return r
       })
@@ -509,6 +509,14 @@ const server = createServer(async (req, res) => {
       const updated = { ...base, updatedAt: now() }
       recipes[idx] = updated
       return json(res, 200, { recipe: updated, summary })
+    }
+
+    const setAsideMatch = path.match(/^\/api\/recipes\/([^/]+)\/set-aside$/)
+    if (setAsideMatch && method === 'POST') {
+      const idx = recipes.findIndex((r) => r.id === setAsideMatch[1])
+      if (idx === -1) return json(res, 404, { error: 'Recipe not found' })
+      recipes[idx] = { ...recipes[idx], status: 'dismissed', setAside: true, inWeek: false, updatedAt: now() }
+      return json(res, 200, { recipe: recipes[idx] })
     }
 
     const cookedMatch = path.match(/^\/api\/recipes\/([^/]+)\/cooked$/)

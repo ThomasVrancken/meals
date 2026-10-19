@@ -8,6 +8,7 @@ const { badRequest, notFound, amsterdamDate, isValidDate, RATINGS } = require('.
 // - thumbs up   -> feedback 'up',   status 'saved'
 // - thumbs down -> feedback 'down', status 'dismissed' (and out of the week)
 // - cooked      -> status 'saved', inWeek false, cookedCount + 1, history entry
+// - set aside   -> status 'dismissed', setAside true, no feedback ("not now", not a dislike)
 
 async function requireRecipe(id) {
   const recipe = await store.getRecipe(id);
@@ -55,6 +56,8 @@ async function patchRecipe(id, body) {
   }
 
   if (Object.keys(patch).length === 0) throw badRequest('No updatable fields in body');
+  // Any other status change supersedes an earlier "not now".
+  if ('status' in patch && recipe.setAside) patch.setAside = false;
   const updated = await store.updateRecipe(id, patch);
   if (feedbackEvent) await recordFeedbackEvents(1);
   return { recipe: updated, feedbackEvent };
@@ -114,11 +117,18 @@ async function markCooked(id, input = {}, { countAsFeedback = false } = {}) {
   return { recipe: updated, entry };
 }
 
-/** Dismiss untouched suggestions (no feedback, not in week). Not a feedback event. */
+/** Remove one suggestion from the Ideas list without rating it. Not a feedback event. */
+async function setAsideSuggestion(id) {
+  const recipe = await requireRecipe(id);
+  if (recipe.status !== 'suggested') throw badRequest('Only suggestions can be set aside');
+  return store.updateRecipe(id, { status: 'dismissed', setAside: true, inWeek: false });
+}
+
+/** Set aside every unrated suggestion that isn't picked for the week. Not a feedback event. */
 async function clearSuggestions() {
   const suggestions = await store.listRecipes('suggested');
   const targets = suggestions.filter((r) => !r.feedback && !r.inWeek);
-  await Promise.all(targets.map((r) => store.updateRecipe(r.id, { status: 'dismissed' })));
+  await Promise.all(targets.map((r) => store.updateRecipe(r.id, { status: 'dismissed', setAside: true })));
   return targets.length;
 }
 
@@ -150,4 +160,12 @@ async function createManualRecipe(body, { source = 'manual' } = {}) {
   return store.createRecipe(buildRecipeDoc(content, { status, source, inWeek: Boolean(body.inWeek) }));
 }
 
-module.exports = { requireRecipe, patchRecipe, markCooked, clearSuggestions, logHistoryEntry, createManualRecipe };
+module.exports = {
+  requireRecipe,
+  patchRecipe,
+  markCooked,
+  setAsideSuggestion,
+  clearSuggestions,
+  logHistoryEntry,
+  createManualRecipe,
+};

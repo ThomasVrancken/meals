@@ -43,7 +43,12 @@ function renderContext({ today, preferences, history, recipes }) {
   const disliked = recipes.filter((r) => r.feedback === 'down').sort(byUpdatedDesc).slice(0, MAX_DISLIKED);
   // Dismissed without a reason: a weak "not in the mood / not for us" signal.
   const passed = recipes
-    .filter((r) => r.status === 'dismissed' && !r.feedback)
+    .filter((r) => r.status === 'dismissed' && !r.feedback && !r.setAside)
+    .sort(byUpdatedDesc)
+    .slice(0, MAX_PASSED);
+  // Removed from Ideas with "not now": neutral, the idea itself was fine.
+  const setAside = recipes
+    .filter((r) => r.status === 'dismissed' && !r.feedback && r.setAside)
     .sort(byUpdatedDesc)
     .slice(0, MAX_PASSED);
   const suggestions = recipes.filter((r) => r.status === 'suggested');
@@ -75,6 +80,10 @@ function renderContext({ today, preferences, history, recipes }) {
       disliked.map((r) => `- ${r.title}${r.feedbackNote ? `: "${r.feedbackNote}"` : ''}`)
     ),
     section('Suggestions we dismissed without a reason (weak signal)', passed.map((r) => `- ${r.title}`)),
+    section(
+      'Suggestions we set aside for now (not a dislike; fine to suggest again another time)',
+      setAside.map((r) => `- ${r.title}`)
+    ),
     section(
       'Current suggestions (in the Ideas list)',
       suggestions.map((r) => `- [${r.id}] ${r.emoji || ''} ${r.title}${r.inWeek ? ' (in week)' : ''}${r.feedback ? ` (feedback: ${r.feedback})` : ''}`)

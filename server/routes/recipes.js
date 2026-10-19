@@ -93,6 +93,12 @@ router.post('/:id/chat', async (req, res) => {
   res.json({ answer, edit });
 });
 
+// "Not now": removes a suggestion from Ideas without counting as a dislike.
+router.post('/:id/set-aside', async (req, res) => {
+  const recipe = await recipes.setAsideSuggestion(req.params.id);
+  res.json({ recipe });
+});
+
 router.post('/:id/cooked', async (req, res) => {
   const { recipe, entry } = await recipes.markCooked(req.params.id, req.body || {});
   res.json({ recipe, entry });

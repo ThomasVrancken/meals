@@ -93,6 +93,10 @@ class ApiService {
     return this.client.post(`/recipes/${id}/cooked`, { rating, note, cookedAt })
   }
 
+  setAsideRecipe(id) {
+    return this.client.post(`/recipes/${id}/set-aside`)
+  }
+
   clearSuggestions() {
     return this.client.post('/recipes/clear-suggestions')
   }

@@ -16,6 +16,7 @@ export function IdeasTab({ onOpenRecipe }) {
   const [count, setCount] = useState(5)
   const [generating, setGenerating] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
   const [error, setError] = useState(null)
 
   const suggestions = useMemo(
@@ -42,8 +43,16 @@ export function IdeasTab({ onOpenRecipe }) {
     }
   }
 
-  const clearUntouched = async () => {
+  // Week picks stay; everything else leaves the list without counting as a dislike.
+  const removable = suggestions.filter((r) => !r.inWeek)
+
+  const removeAll = async () => {
     if (clearing) return
+    if (!confirmClear) {
+      setConfirmClear(true)
+      return
+    }
+    setConfirmClear(false)
     setClearing(true)
     try {
       await api.clearSuggestions()
@@ -128,19 +137,37 @@ export function IdeasTab({ onOpenRecipe }) {
 
             {!generating && suggestions.length > 0 && (
               <>
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <span className="text-xs text-ink-400">
+                    {suggestions.length} suggestion{suggestions.length > 1 ? 's' : ''}
+                  </span>
+                  {removable.length > 0 && (
+                    <div className="flex items-center gap-3">
+                      {confirmClear && (
+                        <button onClick={() => setConfirmClear(false)} className="text-xs text-ink-400 py-1">
+                          Cancel
+                        </button>
+                      )}
+                      <button
+                        onClick={removeAll}
+                        disabled={clearing}
+                        className={`text-xs font-semibold py-1 disabled:opacity-50 ${
+                          confirmClear ? 'text-tomato-600' : 'text-ink-500'
+                        }`}
+                      >
+                        {clearing
+                          ? 'Removing…'
+                          : confirmClear
+                            ? `Remove ${removable.length}${removable.length < suggestions.length ? ' (keeps week picks)' : ''}?`
+                            : 'Remove all'}
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-3">
                   {suggestions.map((r) => (
                     <RecipeCard key={r.id} recipe={r} onOpen={onOpenRecipe} variant="suggested" />
                   ))}
-                </div>
-                <div className="flex justify-center mt-4">
-                  <button
-                    onClick={clearUntouched}
-                    disabled={clearing}
-                    className="text-xs text-ink-400 underline underline-offset-2 disabled:opacity-50"
-                  >
-                    {clearing ? 'Clearing…' : 'Clear untouched'}
-                  </button>
                 </div>
               </>
             )}
