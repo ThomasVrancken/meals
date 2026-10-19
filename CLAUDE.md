@@ -74,6 +74,16 @@ Local `.env` (gitignored) needs `OPENAI_API_KEY`, `APP_TOKEN`, `GOOGLE_CLOUD_PRO
 `COLLECTION_PREFIX=mealsdev_`, `OPENAI_MODEL`, `OPENAI_MODEL_FAST`, `PORT=3002`. Requires
 `gcloud auth application-default login` once (Firestore ADC).
 
+## Cloud sessions (phone)
+
+Thomas starts cloud sessions from his phone (claude.ai/code) in the shared "Hobby apps" environment, whose
+only variable is `GCP_SA_KEY_B64`. `.claude/settings.json` runs `.claude/cloud-session-start.sh` at session start
+(no-op locally): it logs gcloud and Google client libraries in as the `claude-cloud-session` service account,
+restores this repo's gitignored `.env` and `app.yaml` from Secret Manager, and installs npm dependencies. A cloud session can
+therefore test, use Firestore and deploy like a local one. After changing a secret file on the Mac, run
+`bash ~/Documents/projects/hobby/mini-apps/skills/mini-apps/scripts/claude-cloud-setup.sh --secrets`; the
+hook and that script live in the mini-apps repo (keep the copies in sync).
+
 ## Deploy
 
 Prod URL: **https://meals-dot-mlsd-2026-483513.ew.r.appspot.com**
