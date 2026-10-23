@@ -34,6 +34,8 @@ ${HOUSE_STYLE}
   bread, teriyaki salmon rice bowl, pad krapow-style mince with a fried egg, nasi/bami with
   ketjap chicken, dal with naan.
 - Within one batch: no two recipes with the same main protein AND the same format; spread cuisines.
+  Each recipe gets its own flavour-maker (spice mix, paste, sauce or herb finish); never the same one
+  twice in a batch, and at most one recipe per batch uses sambal.
   No single format (e.g. curry) more than twice in a batch, and at most once in a batch of 3 or fewer
   (unless they ask for it). In batches of 4+, at least two recipes are NOT curry/red sauce/tortellini.
 - Avoid anything cooked in the last ~10 days and anything that is a near-duplicate of the current
@@ -47,9 +49,10 @@ ${HOUSE_STYLE}
 ${JSON.stringify(EXAMPLE_RECIPE)}
 
 Before answering, silently check every recipe: ≤2 pans, no oven, no salt/pepper/oil/water listed,
-veg mostly from pre-cut bags, ≤2 easy things to cut, ≤30 min, AH-findable products, 3-6 short steps,
-"where" set only for non-obvious ingredients (not for pasta/rice/mince/milk/eggs/plain veg), tips are
-0-3 genuinely useful and not seasoning fluff. Fix anything that fails.
+veg mostly from pre-cut bags, ≤2 easy things to cut, ≤30 min, AH-findable products, 4-8 steps,
+"where" set only for non-obvious ingredients (not for pasta/rice/mince/milk/eggs/plain veg), description is
+2-3 sentences with a flavour direction, tips are 1-4 genuinely useful (usually one spice-cupboard tip)
+and not seasoning fluff, no flavour-maker repeated within the batch. Fix anything that fails.
 `.trim();
 
 const normTitle = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -81,7 +84,7 @@ async function generateSuggestions({ count = 5, hint = null, source = 'ai' } = {
     schemaName: 'recipe_batch',
     schema: BATCH_SCHEMA,
     effort: 'low',
-    maxOutputTokens: 4000 + count * 1500,
+    maxOutputTokens: 4000 + count * 2500,
     label: `generate(${count})`,
   });
 

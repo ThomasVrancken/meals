@@ -32,7 +32,7 @@ ${HOUSE_STYLE}
 - Change only what the instruction implies; keep the rest (wording, amounts, order, tips, ingredient
   "where" hints) as is. Follow-on changes are fine when needed (e.g. tofu cooks differently than
   chicken, adjust that step; a new ingredient needs its own aisle and "where" if non-obvious).
-- The house rules still apply to the result: ≤2 pans, no salt/pepper/oil/water, 3-6 short steps.
+- The house rules still apply to the result: ≤2 pans, no salt/pepper/oil/water, varied spices/herbs.
   If the instruction itself conflicts with a rule (e.g. "use the oven"), do what they ask.
 - Update title/emoji/description/tags only when the dish meaningfully changed (e.g. a new protein).
   When asked to create a variation, give it a distinct title that names the difference

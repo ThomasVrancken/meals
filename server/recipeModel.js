@@ -17,7 +17,7 @@ const RECIPE_CONTENT_SCHEMA = {
   properties: {
     title: { type: 'string', description: 'Short appetising title, e.g. "Thai green chicken curry"' },
     emoji: { type: 'string', description: 'Exactly one food emoji' },
-    description: { type: 'string', description: 'One sentence: what it is and why it fits them' },
+    description: { type: 'string', description: '2-3 sentences: what it is, its flavour direction and what gives it that character' },
     cuisine: { type: 'string', description: 'Short label, e.g. Thai, Italian, Mexican' },
     tags: { type: 'array', items: { type: 'string' }, description: '2-5 lowercase tags' },
     timeMinutes: { type: 'integer', description: 'Honest total time in minutes, including boiling the carb' },
@@ -42,12 +42,12 @@ const RECIPE_CONTENT_SCHEMA = {
         required: ['name', 'amount', 'aisle', 'note', 'where'],
       },
     },
-    steps: { type: 'array', items: { type: 'string' }, description: '3-6 short imperative steps' },
+    steps: { type: 'array', items: { type: 'string' }, description: '4-8 steps, each 1-2 sentences' },
     tips: {
       type: 'array',
       items: { type: 'string' },
       description:
-        '0-3 short, genuinely useful tips (e.g. order-of-operations, how long leftovers keep, a smart swap). Never generic seasoning fluff like "season with salt and pepper". Empty array if nothing worth saying.',
+        '1-4 genuinely useful tips, usually including one "spice cupboard" tip (a spice mix or flavour palette to take the dish elsewhere); also order-of-operations, a smart swap, leftovers. Never generic seasoning fluff like "season with salt and pepper".',
     },
   },
   required: [
@@ -142,13 +142,13 @@ function normalizeAiContent(raw) {
   if (!Number.isFinite(timeMinutes) || timeMinutes < 5 || timeMinutes > 120) {
     return { ok: false, reason: `${title}: bad timeMinutes` };
   }
-  const tips = (Array.isArray(raw.tips) ? raw.tips : []).map(str).filter(Boolean).slice(0, 3);
+  const tips = (Array.isArray(raw.tips) ? raw.tips : []).map(str).filter(Boolean).slice(0, 4);
   return {
     ok: true,
     content: {
       title: title.slice(0, 120),
       emoji: str(raw.emoji).slice(0, 16) || '🍳',
-      description: str(raw.description).slice(0, 500),
+      description: str(raw.description).slice(0, 800),
       cuisine: str(raw.cuisine).slice(0, 60),
       tags: (Array.isArray(raw.tags) ? raw.tags : [])
         .map((t) => str(t).toLowerCase())
@@ -186,8 +186,8 @@ function validateManualContent(body, { partial = false } = {}) {
     out.emoji = body.emoji.trim() || '🍳';
   } else if (!partial) out.emoji = '🍳';
   if (has('description')) {
-    if (typeof body.description !== 'string' || body.description.length > 500) {
-      throw badRequest('description must be a string (max 500)');
+    if (typeof body.description !== 'string' || body.description.length > 800) {
+      throw badRequest('description must be a string (max 800)');
     }
     out.description = body.description.trim();
   } else if (!partial) out.description = '';
@@ -259,7 +259,7 @@ function validateManualContent(body, { partial = false } = {}) {
     if (!Array.isArray(body.tips) || body.tips.some((t) => typeof t !== 'string') || body.tips.length > 5) {
       throw badRequest('tips must be an array of strings (max 5)');
     }
-    out.tips = body.tips.map((t) => t.trim()).filter(Boolean).slice(0, 3);
+    out.tips = body.tips.map((t) => t.trim()).filter(Boolean).slice(0, 4);
   } else if (!partial) out.tips = [];
   return out;
 }

@@ -90,11 +90,11 @@ Seed values (written once if the doc does not exist; also used as fallback):
 
 `{prefix}recipes/{id}`:
 ```
-{ id, title, emoji, description (1 sentence, what it is / why it fits),
+{ id, title, emoji, description (2–3 sentences: what it is, flavour direction, what gives it that character; max 800),
   cuisine, tags: [string], timeMinutes: number, servings: number (2), pans: number (1|2),
   ingredients: [{ name, amount, aisle, note?, where? }],
-  steps: [string],                 // 3–6 short, direct steps
-  tips: [string],                  // 0–3 short, genuinely useful tips; [] if none. Never seasoning fluff.
+  steps: [string],                 // 4–8 steps, 1–2 sentences each (what to look for / why is fine)
+  tips: [string],                  // 1–4 useful tips, usually one "spice cupboard" tip (a spice mix/palette to take it elsewhere). Never seasoning fluff.
   status: 'suggested'|'saved'|'dismissed',
   inWeek: boolean,                 // picked for this week's shopping
   feedback: 'up'|'down'|null, feedbackNote: string|null,
@@ -205,8 +205,10 @@ current suggestions and week recipes (id, title).
 Produces `count` recipes (structured output, array). Rules for the prompt:
 - Obey cookingStyle/dislikes/shopping strictly: ≤2 pans, pre-cut veg preferred, ≤2 easy things to chop,
   ≤ ~30 min, ingredients findable at a regular AH, 2 servings, pack-size amounts.
-- No salt/pepper/oil/water in ingredients or steps. Steps: 3–6 short imperative lines, no fluff,
-  include heat/timing only when useful (e.g. "Simmer 5 min").
+- No salt/pepper/oil/water in ingredients or steps. Steps: 4–8 steps of 1–2 sentences, practical not
+  chatty (what to look for, when to add spices/herbs).
+- Spice/herb diversity: each recipe has its own flavour-maker (spice mix, paste, sauce, fresh herb),
+  never repeated within a batch; heat sources vary (sambal oelek is not the default).
 - Variety across the batch: mix of proven favourite formats (curry, red sauce, cream pasta)
   in genuinely different variations AND a few new ideas in the same spirit (bowl meals: stir-fries,
   noodle dishes, gnocchi, burrito bowls, shakshuka-style, etc.). Different proteins/cuisines.

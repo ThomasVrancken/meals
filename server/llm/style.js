@@ -32,10 +32,22 @@ defaults here, follow the preferences, and always apply "Learned from our feedba
    "pat dry", "garnish if desired", "enjoy". Assume there is oil in the pan and salt in the pasta
    water. DO name the specific flavour-makers that matter: a paste, sauce, spice mix
    (e.g. AH kruidenmix), sambal, chili flakes, a fresh herb.
-6. SPICY: they love heat. Unless the dish would be odd with it, build in real spice
-   (sambal oelek, fresh red chili, chili flakes, sriracha, gochujang, hot curry paste,
-   jalapeños) and say how much.
-7. INGREDIENTS: only things reliably stocked at a regular Dutch Albert Heijn. Write the English
+6. SPICY: they love heat. Unless the dish would be odd with it, build in real spice and say how
+   much. Vary where the heat comes from and fit it to the cuisine: fresh red chili or bird's eye
+   chili, chili flakes, chipotle in adobo, jalapeños, harissa, sriracha, hot curry paste, Cajun or
+   peri-peri seasoning, sambal (badjak, oelek). Sambal oelek is NOT the default: use it only when
+   it is genuinely the best fit, and not in a batch alongside another sambal dish.
+7. SPICES & HERBS — DIVERSITY: they love "funky" spice blends and fresh herbs as an easy way to
+   lift a dish, and keep a handful of spice mixes at home. Give each recipe its own flavour
+   identity instead of the same few condiments: e.g. ras el hanout, za'atar, dukkah, baharat,
+   shawarma or kebab spices, garam masala, tandoori masala, Chinese five-spice, Cajun, Mexican
+   chili/taco spices, smoked paprika, cumin, Italian herbs (Verstegen, Silvo, AH or Jonnie Boer
+   spice rack), and fresh herbs from AH's herb packs (coriander, mint, Thai basil, flat-leaf parsley,
+   dill, chives). Across a batch, no two recipes should share the same main flavour-maker
+   (spice mix, paste or sauce), and check the recent history so the same one doesn't keep coming
+   back. A fresh herb thrown on at the end counts as zero effort; use them often.
+
+8. INGREDIENTS: only things reliably stocked at a regular Dutch Albert Heijn. Write the English
    name with the Dutch product name in parentheses when it helps to find it, e.g.
    "chicken thigh fillet (kipdijfilet)", "Thai red curry paste (AH / Go-Tan)",
    "wok vegetable mix (AH wokgroente)". Stick to mainstream supermarket products: AH own-brand,
@@ -59,24 +71,30 @@ ${AISLE_GUIDE}
    Asian section", "Chilled section near the fresh pasta", "Spice rack, Verstegen/Silvo" — never a
    made-up aisle number. Leave "where" null for obvious everyday items (pasta, rice, minced beef,
    milk, eggs, plain vegetables, chicken fillet).
-8. STEPS: 3-6 steps, each one short imperative line (max ~20 words). Start with the carb pot if
-   there is one. Call the pans "pot" and "wok"/"pan" consistently. Give heat or timing only when
-   useful ("Simmer 5 min"). No intro, no plating, no serving suggestions beyond the carb.
-9. TITLE & COPY: short appetising title that says what it is ("Thai green chicken curry",
-   "Spicy beef red sauce with penne"). One fitting emoji. Description: one plain sentence on what
-   it is and why it fits them. cuisine: short label. tags: 2-5 lowercase tags (protein, format,
-   "spicy", "vegetarian", ...). pans and timeMinutes must be honest. servings is always 2.
-10. TIPS: 0-3 short, genuinely useful tips — an order-of-operations trick (e.g. "add the coconut
-    milk last so it doesn't split"), how long leftovers keep, or a smart swap. Never generic
-    seasoning fluff ("season with salt and pepper", "add salt to taste"). Return an empty array
-    when there's nothing worth saying rather than padding it.
+9. STEPS: 4-8 steps, each 1-2 sentences. Start with the carb pot if there is one. Call the pans
+   "pot" and "wok"/"pan" consistently. It's fine to be more than a bare command: add what to look
+   for ("until the edges catch and brown"), why a step matters, or when to add the spices/herbs
+   for the best flavour. Keep it practical, not chatty. No intro, no plating, no "enjoy".
+10. TITLE & COPY: short appetising title that says what it is ("Thai green chicken curry",
+   "Spicy beef red sauce with penne"). One fitting emoji. Description: 2-3 sentences that explain
+   the dish: what it is, its flavour direction (e.g. smoky and sweet, fresh and herby, rich and
+   fiery) and what gives it that character, so they understand it and can steer it their own way.
+   cuisine: short label. tags: 2-5 lowercase tags (protein, format, "spicy", "vegetarian", ...).
+   pans and timeMinutes must be honest. servings is always 2.
+11. TIPS: 1-4 genuinely useful tips. Usually include one "spice cupboard" tip: a spice mix,
+    flavour palette or style they could stir in to take the dish somewhere else (e.g. "A pinch of
+    ras el hanout with the mince turns this North African; finish with mint"). Other good tips:
+    an order-of-operations trick ("add the coconut milk last so it doesn't split"), a smart swap,
+    how to dial the heat, how long leftovers keep. Never generic seasoning fluff ("season with
+    salt and pepper", "add salt to taste").
 `.trim();
 
 // A compact example so the model can see the target density and tone.
 const EXAMPLE_RECIPE = {
-  title: 'Thai red chicken curry',
+  title: 'Thai red chicken curry with basil',
   emoji: '🍛',
-  description: 'Your go-to curry format: chicken, a bag of wok veg and red curry paste over rice.',
+  description:
+    'Your go-to curry format: chicken thigh, a bag of wok veg and red curry paste in coconut milk over rice. Rich and gently sweet with real chili heat, lifted at the end by a handful of fresh Thai basil and a squeeze of lime.',
   cuisine: 'Thai',
   tags: ['curry', 'chicken', 'spicy'],
   timeMinutes: 25,
@@ -86,6 +104,7 @@ const EXAMPLE_RECIPE = {
     { name: 'pandan rice (pandanrijst)', amount: '250 g', aisle: 'carbs', note: null, where: null },
     { name: 'chicken thigh strips (kipdijreepjes)', amount: '1 pack (300 g)', aisle: 'meat', note: null, where: null },
     { name: 'wok vegetable mix (AH wokgroente)', amount: '1 bag (400 g)', aisle: 'vegetables', note: null, where: null },
+    { name: 'red chili (rode peper)', amount: '1', aisle: 'vegetables', note: 'sliced, seeds in', where: null },
     {
       name: 'Thai red curry paste (AH / Go-Tan)',
       amount: '3 tbsp',
@@ -95,21 +114,26 @@ const EXAMPLE_RECIPE = {
     },
     { name: 'coconut milk (kokosmelk)', amount: '1 can (400 ml)', aisle: 'world-food', note: null, where: null },
     {
-      name: 'sambal oelek',
-      amount: '1 tsp',
-      aisle: 'world-food',
-      note: 'more if you dare',
-      where: 'World food aisle, near the other sambals',
+      name: 'Thai basil (Thaise basilicum)',
+      amount: '1 pack',
+      aisle: 'vegetables',
+      note: null,
+      where: 'Fresh herbs shelf, next to the pre-cut veg',
     },
   ],
   steps: [
-    'Cook the rice in the pot.',
-    'Brown the chicken in the wok on high heat, 5 min.',
-    'Add the veg mix and stir-fry 4 min.',
-    'Stir in curry paste and sambal for 1 min, then the coconut milk.',
-    'Simmer 5 min and serve over the rice.',
+    'Start the rice in the pot.',
+    'Brown the chicken in the wok on high heat for about 5 min, until it picks up some colour.',
+    'Add the veg mix and the chili and stir-fry 3-4 min, so the veg keeps some bite.',
+    'Push everything aside, fry the curry paste in the free spot for 1 min until it smells fragrant, then stir it through.',
+    'Pour in the coconut milk and simmer 5 min until slightly thickened.',
+    'Take the wok off the heat, tear in the basil and serve over the rice.',
   ],
-  tips: ['Stir the coconut milk in at the end and just warm it through so it doesn\'t split.'],
+  tips: [
+    "Frying the paste on its own for a minute wakes up the spices; that's where most of the flavour comes from.",
+    'Spice cupboard: a pinch of five-spice or garam masala with the paste pushes it towards a warmer, Malaysian-style curry.',
+    "Stir the coconut milk in at the end and just simmer gently so it doesn't split.",
+  ],
 };
 
 module.exports = { HOUSE_STYLE, EXAMPLE_RECIPE };
