@@ -19,10 +19,15 @@ export function IdeasTab({ onOpenRecipe }) {
   const [confirmClear, setConfirmClear] = useState(false)
   const [error, setError] = useState(null)
 
+  // Week picks live on the Week tab; they come back here only if taken out of the week uncooked.
   const suggestions = useMemo(
-    () => recipes.filter((r) => r.status === 'suggested').sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+    () =>
+      recipes
+        .filter((r) => r.status === 'suggested' && !r.inWeek)
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
     [recipes]
   )
+  const weekPicks = useMemo(() => recipes.filter((r) => r.status === 'suggested' && r.inWeek).length, [recipes])
   const cookbook = useMemo(
     () => recipes.filter((r) => r.status === 'saved').sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
     [recipes]
@@ -42,9 +47,6 @@ export function IdeasTab({ onOpenRecipe }) {
       setGenerating(false)
     }
   }
-
-  // Week picks stay; everything else leaves the list without counting as a dislike.
-  const removable = suggestions.filter((r) => !r.inWeek)
 
   const removeAll = async () => {
     if (clearing) return
@@ -140,8 +142,9 @@ export function IdeasTab({ onOpenRecipe }) {
                 <div className="flex items-center justify-between mb-2 px-1">
                   <span className="text-xs text-ink-400">
                     {suggestions.length} suggestion{suggestions.length > 1 ? 's' : ''}
+                    {weekPicks > 0 && ` · ${weekPicks} moved to your week`}
                   </span>
-                  {removable.length > 0 && (
+                  {suggestions.length > 0 && (
                     <div className="flex items-center gap-3">
                       {confirmClear && (
                         <button onClick={() => setConfirmClear(false)} className="text-xs text-ink-400 py-1">
@@ -158,7 +161,7 @@ export function IdeasTab({ onOpenRecipe }) {
                         {clearing
                           ? 'Removing…'
                           : confirmClear
-                            ? `Remove ${removable.length}${removable.length < suggestions.length ? ' (keeps week picks)' : ''}?`
+                            ? `Remove ${suggestions.length}?`
                             : 'Remove all'}
                       </button>
                     </div>

@@ -135,7 +135,8 @@ A pre-2026-09 dataset used a 9-key taxonomy (`produce`, `meat-fish`, `dairy-eggs
 `scripts/migrate-aisles.js` (one-off backfill) and as a read-time safety net (`normalizeAisle`) so
 any unmigrated data still groups sensibly instead of crashing or vanishing.
 
-Status semantics: `suggested` = shown in Ideas; `saved` = in the cookbook (favourites / cooked
+Status semantics: `suggested` = shown in Ideas (unless `inWeek`: week picks show only on the Week tab, and
+return to Ideas if taken out of the week uncooked); `saved` = in the cookbook (favourites / cooked
 before); `dismissed` = hidden (kept as a negative signal, unless `setAside`: removed with "not now", which
 the AI sees as neutral and may suggest again). Thumbs-down on a suggestion sets
 `feedback:'down'` AND `status:'dismissed'`. Thumbs-up sets `feedback:'up'` and `status:'saved'`.

@@ -70,6 +70,19 @@ export function RecipeDetail({ recipeId, onClose }) {
     }
   }
 
+  // "Not now": off the Ideas list without a rating, same as the X on the card.
+  const setAside = async () => {
+    if (busy) return
+    setBusy(true)
+    try {
+      await api.setAsideRecipe(recipe.id)
+      await refreshRecipes()
+      onClose()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const confirmDismiss = async (reason) => {
     await api.updateRecipe(recipe.id, { feedback: 'down', feedbackNote: reason || null })
     await refreshRecipes()
@@ -187,6 +200,16 @@ export function RecipeDetail({ recipeId, onClose }) {
               Cooked ✓
             </button>
           </div>
+
+          {recipe.status === 'suggested' && !recipe.inWeek && (
+            <button
+              onClick={setAside}
+              disabled={busy}
+              className="w-full mt-2 py-2 text-sm text-ink-500 active:text-ink-700 disabled:opacity-50"
+            >
+              Not this week, remove from suggestions
+            </button>
+          )}
 
           <div className="mt-6">
             <h2 className="text-base font-bold text-ink-800 mb-2">Ingredients</h2>
