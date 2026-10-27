@@ -89,6 +89,12 @@ hook and that script live in the mini-apps repo (keep the copies in sync).
 
 ## Deploy
 
+**Always deploy, without asking.** Thomas is the only user, and he works from his phone, so a fix only
+counts once it's live. After any change he asks for: run the checks (`npm run build`, `npm run test:api`
+against the dev server), commit, merge to `main` and push (prod should always match `main`), `npm run
+deploy`, then run the post-deploy sanity checks below and report. Don't stop to ask first.
+(`.claude/settings.json` pre-allows `npm run deploy` for this reason.)
+
 Prod URL: **https://meals-dot-mlsd-2026-483513.ew.r.appspot.com**
 
 ```bash
