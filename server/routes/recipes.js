@@ -5,6 +5,7 @@ const { generateSuggestions } = require('../services/generate');
 const { editRecipe } = require('../services/recipeEdit');
 const { chatAboutRecipe } = require('../services/recipeChat');
 const { badRequest, notFound } = require('../http');
+const { respond } = require('../jobs');
 
 const router = express.Router();
 
@@ -26,8 +27,7 @@ router.post('/generate', async (req, res) => {
     if (body.hint.length > 500) throw badRequest('hint is too long (max 500 chars)');
     hint = body.hint.trim() || null;
   }
-  const created = await generateSuggestions({ count, hint, source: 'ai' });
-  res.json({ recipes: created });
+  await respond(req, res, async () => ({ recipes: await generateSuggestions({ count, hint, source: 'ai' }) }));
 });
 
 router.post('/clear-suggestions', async (req, res) => {
@@ -66,12 +66,14 @@ router.post('/:id/ai-edit', async (req, res) => {
   if (body.asVariation !== undefined && typeof body.asVariation !== 'boolean') {
     throw badRequest('asVariation must be a boolean');
   }
-  const { recipe, summary } = await editRecipe(req.params.id, {
-    instruction: body.instruction.trim(),
-    asVariation: Boolean(body.asVariation),
-    source: 'ai',
+  await respond(req, res, async () => {
+    const { recipe, summary } = await editRecipe(req.params.id, {
+      instruction: body.instruction.trim(),
+      asVariation: Boolean(body.asVariation),
+      source: 'ai',
+    });
+    return { recipe, summary };
   });
-  res.json({ recipe, summary });
 });
 
 // Per-recipe chat: answers questions and may edit the recipe itself (see services/recipeChat.js).
@@ -89,8 +91,10 @@ router.post('/:id/chat', async (req, res) => {
       return { role: h.role, text: h.text.slice(0, 2000) };
     });
   }
-  const { answer, edit } = await chatAboutRecipe(req.params.id, { message: body.message.trim(), history });
-  res.json({ answer, edit });
+  await respond(req, res, async () => {
+    const { answer, edit } = await chatAboutRecipe(req.params.id, { message: body.message.trim(), history });
+    return { answer, edit };
+  });
 });
 
 // "Not now": removes a suggestion from Ideas without counting as a dislike.

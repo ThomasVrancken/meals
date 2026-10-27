@@ -4,10 +4,15 @@ const API_BASE = '/api'
 export const TOKEN_STORAGE_KEY = 'two_pans_token'
 const API_CACHE_NAME = 'two-pans-api-v1' // must match public/sw.js
 
-// AI calls (generate, ai-edit, chat) can legitimately take 10-60s server
-// side, so the client timeout is generous (2 min) rather than the default.
-const LONG_TIMEOUT = 120000
+// AI calls (generate, ai-edit, chat) can take 60s+ server side, but iOS
+// WebKit drops any request with no response after ~60s. So they run as server
+// jobs (`Prefer: respond-async` -> 202 {jobId}) that we poll with short
+// requests until done, giving up after LONG_TIMEOUT.
+const LONG_TIMEOUT = 180000
 const DEFAULT_TIMEOUT = 15000
+const POLL_INTERVAL = 2000
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 class ApiService {
   constructor() {
@@ -59,6 +64,32 @@ class ApiService {
     }
   }
 
+  // POST a long AI call as a server job and poll until it finishes.
+  async postLong(url, body) {
+    const started = await this.client.post(url, body, { headers: { Prefer: 'respond-async' } })
+    if (!started?.jobId) return started // server answered synchronously
+    const deadline = Date.now() + LONG_TIMEOUT
+    while (Date.now() < deadline) {
+      await sleep(POLL_INTERVAL)
+      let job
+      try {
+        job = await this.client.get(`/jobs/${started.jobId}`)
+      } catch (err) {
+        // A dropped poll (flaky mobile network, phone briefly asleep) is not
+        // fatal: the job keeps running server side, so just poll again.
+        if (!err.status || err.status >= 500) continue
+        throw err
+      }
+      if (job.status === 'done') return job.result
+      if (job.status === 'error') {
+        const failed = new Error(job.error || 'Something went wrong')
+        failed.status = job.httpStatus
+        throw failed
+      }
+    }
+    throw new Error('This is taking unusually long. Check back in a minute.')
+  }
+
   // Auth check
   me() {
     return this.client.get('/me')
@@ -74,7 +105,7 @@ class ApiService {
   }
 
   generateRecipes({ count = 5, hint } = {}) {
-    return this.client.post('/recipes/generate', { count, hint }, { timeout: LONG_TIMEOUT })
+    return this.postLong('/recipes/generate', { count, hint })
   }
 
   updateRecipe(id, patch) {
@@ -82,11 +113,11 @@ class ApiService {
   }
 
   aiEditRecipe(id, { instruction, asVariation = false }) {
-    return this.client.post(`/recipes/${id}/ai-edit`, { instruction, asVariation }, { timeout: LONG_TIMEOUT })
+    return this.postLong(`/recipes/${id}/ai-edit`, { instruction, asVariation })
   }
 
   chatRecipe(id, { message, history } = {}) {
-    return this.client.post(`/recipes/${id}/chat`, { message, history }, { timeout: LONG_TIMEOUT })
+    return this.postLong(`/recipes/${id}/chat`, { message, history })
   }
 
   cookRecipe(id, { rating, note, cookedAt } = {}) {
@@ -142,7 +173,7 @@ class ApiService {
   }
 
   sendChat(message) {
-    return this.client.post('/chat', { message }, { timeout: LONG_TIMEOUT })
+    return this.postLong('/chat', { message })
   }
 
   clearChat() {

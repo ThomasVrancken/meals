@@ -35,9 +35,10 @@ let passed = 0;
 let failed = 0;
 const created = { recipes: [], history: [], shoppingItems: [] };
 
-async function api(method, url, body, { token = TOKEN } = {}) {
+async function api(method, url, body, { token = TOKEN, prefer } = {}) {
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
+  if (prefer) headers.Prefer = prefer;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(`${BASE}${url}`, {
     method,
@@ -370,6 +371,26 @@ async function run() {
   check('recipe chat unknown recipe -> 404', r.status === 404, r.data);
   r = await api('POST', '/api/chat', { message: '   ' });
   check('chat with empty message -> 400', r.status === 400, r.data);
+
+  // --- async jobs (Prefer: respond-async), using a call that fails fast without the model
+  console.log('\nAsync jobs');
+  r = await api('POST', '/api/recipes/generate', { count: 99 }, { prefer: 'respond-async' });
+  check('async generate count 99 -> direct 400 (validated before the job)', r.status === 400, r.data);
+  r = await api('POST', '/api/recipes/doesnotexist123/ai-edit', { instruction: 'spicier' }, { prefer: 'respond-async' });
+  check('async ai-edit -> 202 {jobId}', r.status === 202 && typeof r.data.jobId === 'string', r.data);
+  let job = null;
+  for (let i = 0; i < 20 && r.data && r.data.jobId; i++) {
+    job = (await api('GET', `/api/jobs/${r.data.jobId}`)).data;
+    if (job && job.status !== 'running') break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  check(
+    'async ai-edit unknown recipe -> job error 404',
+    job && job.status === 'error' && job.httpStatus === 404 && job.error,
+    job
+  );
+  r = await api('GET', '/api/jobs/doesnotexist123');
+  check('GET unknown job -> 404', r.status === 404 && r.data.error, r.data);
 
   // --- shopping items (manual "Other groceries" list)
   console.log('\nShopping items');

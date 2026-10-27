@@ -27,6 +27,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return; // never cache mutating calls
 
   const url = new URL(request.url);
+  if (url.pathname.startsWith('/api/jobs/')) return; // job polls: always live, never cached
 
   // API reads: network-first, cache the last good response so the app
   // still shows something with no connection.

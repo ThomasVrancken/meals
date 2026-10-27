@@ -186,7 +186,13 @@ error) since there's no recipe context to infer it from; PATCH lets the user cha
 | DELETE `/api/shopping-items/:id` | | `{ok}` |
 | POST `/api/shopping-items/clear-checked` | | `{deleted: n}` |
 
-Errors: `{error: string}` with sensible status. LLM calls can take 10–60 s; that's fine.
+| GET `/api/jobs/:id` | | `{status:'running'}` \| `{status:'done', result}` \| `{status:'error', error, httpStatus}`; 404 if unknown/expired (15 min) |
+
+Errors: `{error: string}` with sensible status. LLM calls can take 10–70 s. iOS WebKit drops requests with
+no response after ~60 s, so the four AI POSTs (generate, ai-edit, recipe chat, chat) also accept
+`Prefer: respond-async`: input is validated as usual (direct 400), then they answer `202 {jobId}` and run in
+the background; the client polls `GET /api/jobs/:id` (body of `result` = the normal response). Jobs are
+in-memory (`server/jobs.js`), which relies on `max_instances: 1`. Without the header they answer synchronously.
 
 Shopping list (deterministic, no LLM): merge ingredients of all `inWeek` recipes by normalized name
 (lowercase, trimmed, strip parentheses content for the key), keep all amounts as separate strings,

@@ -6,6 +6,7 @@ const express = require('express');
 const { requireAuth } = require('./auth');
 const store = require('./db');
 const { redact } = require('./llm/openai');
+const { getJob, errorResponse } = require('./jobs');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -29,6 +30,12 @@ app.use('/api/history', require('./routes/history'));
 app.use('/api/preferences', require('./routes/preferences'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/shopping-items', require('./routes/shoppingItems'));
+// Poll a long AI call started with `Prefer: respond-async` (see jobs.js).
+app.get('/api/jobs/:id', (req, res) => {
+  const job = getJob(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Job not found (expired, or the server restarted)' });
+  return res.json(job);
+});
 app.use('/api', (req, res) => res.status(404).json({ error: `No API route for ${req.method} ${req.path}` }));
 
 // --- Static client (PWA) ----------------------------------------------------
@@ -67,9 +74,8 @@ app.get('/{*splat}', (req, res) => {
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON body' });
   if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Request body too large' });
-  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  const { status, message } = errorResponse(err);
   if (status >= 500) console.error(`[error] ${req.method} ${req.path}: ${redact(err.stack || err.message)}`);
-  const message = status === 500 ? 'Internal server error' : redact(err.message);
   return res.status(status).json({ error: message });
 });
 

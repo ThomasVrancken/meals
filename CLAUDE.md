@@ -39,13 +39,16 @@ Code sessions.
     (background "learned" notes rewrite, fires after 3 feedback events), `shoppingList.js`
     (deterministic, no LLM, groups by `aisles.js` order), `recipes.js` (shared status/feedback/cooked
     semantics used by routes + chat tools).
+  - `server/jobs.js` — `respond()`: runs a long AI route synchronously, or as an in-memory job the
+    client polls via `GET /api/jobs/:id` when it sends `Prefer: respond-async`.
   - `server/routes/*.js` — thin, delegate to `services/`. `shoppingItems.js` is the manual
     "Other groceries" CRUD (classifies aisle on create).
 - `client/`: React 18 + Vite + Tailwind 3 PWA, own `package.json`, builds to `client/dist`
   (served by the Express server, not a separate static host).
   - `client/src/context/DataContext.jsx` — shared data layer (recipes/week/history/prefs) so
     a mutation from any tab (including chat) refreshes every other tab via `applyChanged`.
-  - `client/src/services/api.js` — axios wrapper, 120s timeout on generate/ai-edit/chat calls.
+  - `client/src/services/api.js` — axios wrapper; generate/ai-edit/chat calls run as polled
+    server jobs (`postLong`, see the iOS gotcha below).
   - `client/public/sw.js` — service worker: navigations + index.html network-first (never
     cache-first — see gotcha below), hashed assets cache-first, API GETs network-first with
     cache fallback, mutating calls never cached.
@@ -173,10 +176,14 @@ not a hard requirement for the app to function.
   production" when it was actually a Playwright script invoked as `TOKEN=$(...) node -e
   "...${TOKEN}..."` silently getting an empty token. Use a separate `TOKEN=$(...)` statement
   (own line or `;`-separated) before referencing `$TOKEN`.
-- App Engine Standard automatic-scaling instances happily run 60–65s LLM-backed requests
-  (`POST /api/recipes/generate` observed at ~20s and ~65s in testing) without hitting a
-  platform timeout — no special handling needed beyond the client's existing 120s axios
-  timeout on AI endpoints.
+- **iOS drops requests after ~60s ("Network Error").** App Engine itself happily runs 60–70s
+  LLM-backed requests, but iOS WebKit kills any XHR with no response after ~60s regardless of the
+  axios timeout, so once generation crossed ~60s (fuller recipe style, 2026-10) the phone showed
+  "Network Error" while the server still finished and saved the batch. App Engine Standard buffers
+  responses, so keep-alive streaming can't help. Fix: the client sends the four AI POSTs with
+  `Prefer: respond-async` and polls `GET /api/jobs/:id` (`server/jobs.js`, `api.postLong`). Jobs are
+  in-memory: if `max_instances` is ever raised above 1, move them to Firestore. Any new slow endpoint
+  should go through `respond()` / `postLong` too.
 
 ## Production data
 
